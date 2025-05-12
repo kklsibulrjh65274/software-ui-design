@@ -1,10 +1,20 @@
 "use client"
 
 import { useState } from "react"
-import { Table, Database, Search, Filter, MoreHorizontal, Play, Download, Upload } from "lucide-react"
+import {
+  Table,
+  Database,
+  Search,
+  Filter,
+  MoreHorizontal,
+  Play,
+  Download,
+  Upload,
+  AlertTriangle
+} from "lucide-react"
 
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
@@ -17,6 +27,20 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Textarea } from "@/components/ui/textarea"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+
+// 导入 API
+import { databaseApi } from "@/api"
 
 const databases = [
   { id: "postgres-main", name: "主数据库", charset: "UTF-8", collation: "en_US.UTF-8", size: "1.2 TB", tables: 42 },
@@ -44,21 +68,93 @@ export default function RelationalDatabasePage() {
   const [activeTab, setActiveTab] = useState("databases")
   const [sqlQuery, setSqlQuery] = useState("SELECT * FROM users LIMIT 10;")
   const [queryResult, setQueryResult] = useState<any>(null)
+  const [selectedDatabase, setSelectedDatabase] = useState("postgres-main")
+  const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false)
+  const [uploadFile, setUploadFile] = useState<File | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [isLoading, setIsLoading] = useState(false)
 
-  const handleExecuteQuery = () => {
-    // 模拟查询结果
-    setQueryResult({
-      columns: ["id", "username", "email", "created_at"],
-      rows: [
-        { id: 1, username: "admin", email: "admin@example.com", created_at: "2023-01-01 00:00:00" },
-        { id: 2, username: "user1", email: "user1@example.com", created_at: "2023-01-02 10:30:00" },
-        { id: 3, username: "user2", email: "user2@example.com", created_at: "2023-01-03 14:45:00" },
-        { id: 4, username: "user3", email: "user3@example.com", created_at: "2023-01-04 09:15:00" },
-        { id: 5, username: "user4", email: "user4@example.com", created_at: "2023-01-05 16:20:00" },
-      ],
-      executionTime: "0.023 秒",
-      rowCount: 5,
-    })
+  const handleExecuteQuery = async () => {
+    try {
+      setIsLoading(true)
+      setError(null)
+      
+      // 使用 API 执行查询
+      const response = await databaseApi.executeQuery(selectedDatabase, sqlQuery)
+      
+      if (response.success) {
+        setQueryResult(response.data)
+      } else {
+        setError(response.message || "查询执行失败")
+      }
+    } catch (err) {
+      console.error("执行查询出错:", err)
+      setError("执行查询时发生错误")
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleDownloadQuery = () => {
+    if (!queryResult) {
+      setError("没有可下载的查询结果")
+      return
+    }
+
+    try {
+      // 将查询结果转换为 CSV 格式
+      const headers = queryResult.columns.join(',')
+      const rows = queryResult.rows.map((row: any) => 
+        queryResult.columns.map((col: string) => `"${row[col]}"`).join(',')
+      ).join('\n')
+      const csvContent = `${headers}\n${rows}`
+      
+      // 创建 Blob 对象
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+      
+      // 创建下载链接并触发下载
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.setAttribute('download', `query-result-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.csv`)
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+    } catch (err) {
+      console.error("下载查询结果出错:", err)
+      setError("下载查询结果时发生错误")
+    }
+  }
+
+  const handleUploadSQL = async () => {
+    if (!uploadFile) {
+      setError("请选择要上传的 SQL 文件")
+      return
+    }
+
+    try {
+      setIsLoading(true)
+      
+      // 读取文件内容
+      const reader = new FileReader()
+      reader.onload = async (e) => {
+        const fileContent = e.target?.result as string
+        if (fileContent) {
+          setSqlQuery(fileContent)
+          setIsUploadDialogOpen(false)
+          setIsLoading(false)
+        }
+      }
+      reader.onerror = () => {
+        setError("读取文件失败")
+        setIsLoading(false)
+      }
+      reader.readAsText(uploadFile)
+    } catch (err) {
+      console.error("上传 SQL 文件出错:", err)
+      setError("上传 SQL 文件时发生错误")
+      setIsLoading(false)
+    }
   }
 
   return (
@@ -75,6 +171,14 @@ export default function RelationalDatabasePage() {
           </Button>
         </div>
       </div>
+
+      {error && (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>错误</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList>
@@ -185,20 +289,63 @@ export default function RelationalDatabasePage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-center gap-2">
-                <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
-                  <option value="postgres-main">主数据库 (postgres-main)</option>
-                  <option value="postgres-replica">副本数据库 (postgres-replica)</option>
-                  <option value="postgres-dev">开发数据库 (postgres-dev)</option>
-                  <option value="postgres-test">测试数据库 (postgres-test)</option>
-                  <option value="postgres-analytics">分析数据库 (postgres-analytics)</option>
-                </select>
-                <Button variant="outline" size="icon">
+                <Select value={selectedDatabase} onValueChange={setSelectedDatabase}>
+                  <SelectTrigger className="w-[250px]">
+                    <SelectValue placeholder="选择数据库" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {databases.map((db) => (
+                      <SelectItem key={db.id} value={db.id}>
+                        {db.name} ({db.id})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                
+                <Dialog open={isUploadDialogOpen} onOpenChange={setIsUploadDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" size="icon" title="上传 SQL 文件">
+                      <Upload className="h-4 w-4" />
+                      <span className="sr-only">上传</span>
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>上传 SQL 文件</DialogTitle>
+                      <DialogDescription>选择一个 SQL 文件上传到查询编辑器</DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                      <Input 
+                        type="file" 
+                        accept=".sql,.txt" 
+                        onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
+                      />
+                      {uploadFile && (
+                        <p className="text-sm text-muted-foreground">
+                          已选择: {uploadFile.name} ({(uploadFile.size / 1024).toFixed(2)} KB)
+                        </p>
+                      )}
+                    </div>
+                    <DialogFooter>
+                      <Button variant="outline" onClick={() => setIsUploadDialogOpen(false)}>
+                        取消
+                      </Button>
+                      <Button onClick={handleUploadSQL} disabled={!uploadFile || isLoading}>
+                        {isLoading ? "上传中..." : "上传"}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+                
+                <Button 
+                  variant="outline" 
+                  size="icon" 
+                  onClick={handleDownloadQuery} 
+                  disabled={!queryResult}
+                  title="下载查询结果"
+                >
                   <Download className="h-4 w-4" />
                   <span className="sr-only">下载</span>
-                </Button>
-                <Button variant="outline" size="icon">
-                  <Upload className="h-4 w-4" />
-                  <span className="sr-only">上传</span>
                 </Button>
               </div>
 
@@ -206,12 +353,22 @@ export default function RelationalDatabasePage() {
                 value={sqlQuery}
                 onChange={(e) => setSqlQuery(e.target.value)}
                 className="font-mono min-h-[200px]"
+                placeholder="输入 SQL 查询语句..."
               />
 
               <div className="flex justify-end">
-                <Button onClick={handleExecuteQuery}>
-                  <Play className="mr-2 h-4 w-4" />
-                  执行查询
+                <Button onClick={handleExecuteQuery} disabled={isLoading}>
+                  {isLoading ? (
+                    <>
+                      <Play className="mr-2 h-4 w-4 animate-pulse" />
+                      执行中...
+                    </>
+                  ) : (
+                    <>
+                      <Play className="mr-2 h-4 w-4" />
+                      执行查询
+                    </>
+                  )}
                 </Button>
               </div>
 
@@ -249,6 +406,13 @@ export default function RelationalDatabasePage() {
                         ))}
                       </tbody>
                     </table>
+                  </div>
+                  
+                  <div className="flex justify-end">
+                    <Button variant="outline" size="sm" onClick={handleDownloadQuery}>
+                      <Download className="mr-2 h-4 w-4" />
+                      下载结果
+                    </Button>
                   </div>
                 </div>
               )}
