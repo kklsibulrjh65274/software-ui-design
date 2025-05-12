@@ -19,58 +19,8 @@ import {
 import { Progress } from "@/components/ui/progress"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 
-const nodes = [
-  {
-    id: "node-01",
-    name: "节点 1",
-    ip: "192.168.1.101",
-    role: "主节点",
-    status: "在线",
-    cpu: 45,
-    memory: 62,
-    disk: 38,
-  },
-  {
-    id: "node-02",
-    name: "节点 2",
-    ip: "192.168.1.102",
-    role: "主节点",
-    status: "在线",
-    cpu: 32,
-    memory: 48,
-    disk: 55,
-  },
-  {
-    id: "node-03",
-    name: "节点 3",
-    ip: "192.168.1.103",
-    role: "数据节点",
-    status: "在线",
-    cpu: 78,
-    memory: 85,
-    disk: 72,
-  },
-  {
-    id: "node-04",
-    name: "节点 4",
-    ip: "192.168.1.104",
-    role: "数据节点",
-    status: "在线",
-    cpu: 25,
-    memory: 42,
-    disk: 30,
-  },
-  {
-    id: "node-05",
-    name: "节点 5",
-    ip: "192.168.1.105",
-    role: "数据节点",
-    status: "离线",
-    cpu: 0,
-    memory: 0,
-    disk: 0,
-  },
-]
+// 导入 mock 数据
+import { nodes } from "@/mock/dashboard"
 
 export default function ClusterNodesPage() {
   const [activeTab, setActiveTab] = useState("nodes")
