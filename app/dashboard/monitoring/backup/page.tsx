@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import {
   Calendar,
   Clock,
@@ -32,97 +32,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 
-// 模拟备份历史数据
-const backupHistory = [
-  {
-    id: "backup-001",
-    name: "每日自动备份",
-    type: "自动",
-    status: "成功",
-    size: "2.4 GB",
-    startTime: "2023-05-10 00:00:00",
-    endTime: "2023-05-10 00:45:22",
-    duration: "45分钟",
-  },
-  {
-    id: "backup-002",
-    name: "每周完整备份",
-    type: "自动",
-    status: "成功",
-    size: "8.7 GB",
-    startTime: "2023-05-07 01:00:00",
-    endTime: "2023-05-07 02:35:15",
-    duration: "1小时35分钟",
-  },
-  {
-    id: "backup-003",
-    name: "版本发布前备份",
-    type: "手动",
-    status: "成功",
-    size: "7.2 GB",
-    startTime: "2023-05-05 10:15:00",
-    endTime: "2023-05-05 11:42:30",
-    duration: "1小时27分钟",
-  },
-  {
-    id: "backup-004",
-    name: "数据库迁移前备份",
-    type: "手动",
-    status: "失败",
-    size: "-",
-    startTime: "2023-05-03 14:30:00",
-    endTime: "2023-05-03 14:45:12",
-    duration: "15分钟",
-  },
-  {
-    id: "backup-005",
-    name: "每月完整备份",
-    type: "自动",
-    status: "成功",
-    size: "10.5 GB",
-    startTime: "2023-05-01 01:00:00",
-    endTime: "2023-05-01 03:12:45",
-    duration: "2小时12分钟",
-  },
-]
-
-// 模拟备份计划数据
-const backupSchedules = [
-  {
-    id: "schedule-001",
-    name: "每日增量备份",
-    type: "增量",
-    schedule: "每天 00:00",
-    target: "所有数据库",
-    retention: "7天",
-    status: "启用",
-    lastRun: "2023-05-10 00:00:00",
-    nextRun: "2023-05-11 00:00:00",
-  },
-  {
-    id: "schedule-002",
-    name: "每周完整备份",
-    type: "完整",
-    schedule: "每周日 01:00",
-    target: "所有数据库",
-    retention: "4周",
-    status: "启用",
-    lastRun: "2023-05-07 01:00:00",
-    nextRun: "2023-05-14 01:00:00",
-  },
-  {
-    id: "schedule-003",
-    name: "每月归档备份",
-    type: "完整",
-    schedule: "每月1日 01:00",
-    target: "所有数据库",
-    retention: "12个月",
-    status: "启用",
-    lastRun: "2023-05-01 01:00:00",
-    nextRun: "2023-06-01 01:00:00",
-  },
-]
+// 导入 API
+import { monitoringApi } from "@/api"
+import { BackupHistory, BackupSchedule } from "@/mock/dashboard/types"
 
 export default function BackupManagementPage() {
   const [activeTab, setActiveTab] = useState("overview")
@@ -130,25 +44,86 @@ export default function BackupManagementPage() {
   const [isBackingUp, setIsBackingUp] = useState(false)
   const [isRestoreDialogOpen, setIsRestoreDialogOpen] = useState(false)
   const [selectedBackup, setSelectedBackup] = useState<string | null>(null)
+  const [backupHistory, setBackupHistory] = useState<BackupHistory[]>([])
+  const [backupSchedules, setBackupSchedules] = useState<BackupSchedule[]>([])
+  const [loading, setLoading] = useState({
+    history: true,
+    schedules: true
+  })
+  const [error, setError] = useState<string | null>(null)
 
-  const handleStartBackup = () => {
-    setIsBackingUp(true)
-    setBackupProgress(0)
-
-    // 模拟备份进度
-    const interval = setInterval(() => {
-      setBackupProgress((prev) => {
-        const next = prev + 5
-        if (next >= 100) {
-          clearInterval(interval)
-          setTimeout(() => {
-            setIsBackingUp(false)
-          }, 1000)
-          return 100
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        // 获取备份历史
+        setLoading(prev => ({ ...prev, history: true }))
+        const historyResponse = await monitoringApi.getBackupHistory()
+        if (historyResponse.success) {
+          setBackupHistory(historyResponse.data)
+        } else {
+          setError(historyResponse.message)
         }
-        return next
+        
+        // 获取备份计划
+        setLoading(prev => ({ ...prev, schedules: true }))
+        const schedulesResponse = await monitoringApi.getBackupSchedules()
+        if (schedulesResponse.success) {
+          setBackupSchedules(schedulesResponse.data)
+        } else {
+          setError(schedulesResponse.message)
+        }
+      } catch (err) {
+        setError('获取备份数据失败')
+        console.error(err)
+      } finally {
+        setLoading({
+          history: false,
+          schedules: false
+        })
+      }
+    }
+
+    fetchData()
+  }, [])
+
+  const handleStartBackup = async () => {
+    try {
+      setIsBackingUp(true)
+      setBackupProgress(0)
+      
+      // 创建手动备份
+      const response = await monitoringApi.createManualBackup({
+        name: "手动备份",
+        type: "完整"
       })
-    }, 500)
+      
+      if (!response.success) {
+        setError(response.message)
+        setIsBackingUp(false)
+        return
+      }
+      
+      // 模拟备份进度
+      const interval = setInterval(() => {
+        setBackupProgress((prev) => {
+          const next = prev + 5
+          if (next >= 100) {
+            clearInterval(interval)
+            setTimeout(() => {
+              setIsBackingUp(false)
+              // 添加新备份到历史记录
+              setBackupHistory(prev => [response.data, ...prev])
+            }, 1000)
+            return 100
+          }
+          return next
+        })
+      }, 500)
+    } catch (err) {
+      setError('启动备份失败')
+      console.error(err)
+      setIsBackingUp(false)
+    }
   }
 
   const handleOpenRestoreDialog = (backupId: string) => {
@@ -183,6 +158,14 @@ export default function BackupManagementPage() {
           </Button>
         </div>
       </div>
+
+      {error && (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>错误</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
 
       {isBackingUp && (
         <Card>
@@ -312,49 +295,55 @@ export default function BackupManagementPage() {
               <CardDescription>最近 3 次备份记录</CardDescription>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>备份名称</TableHead>
-                    <TableHead>类型</TableHead>
-                    <TableHead>状态</TableHead>
-                    <TableHead>大小</TableHead>
-                    <TableHead>完成时间</TableHead>
-                    <TableHead className="text-right">操作</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {backupHistory.slice(0, 3).map((backup) => (
-                    <TableRow key={backup.id}>
-                      <TableCell className="font-medium">{backup.name}</TableCell>
-                      <TableCell>{backup.type}</TableCell>
-                      <TableCell>
-                        <Badge variant={backup.status === "成功" ? "success" : "destructive"}>
-                          {backup.status === "成功" ? (
-                            <CheckCircle className="mr-1 h-3 w-3" />
-                          ) : (
-                            <XCircle className="mr-1 h-3 w-3" />
-                          )}
-                          {backup.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>{backup.size}</TableCell>
-                      <TableCell>{backup.endTime}</TableCell>
-                      <TableCell className="text-right">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleOpenRestoreDialog(backup.id)}
-                          disabled={backup.status !== "成功"}
-                        >
-                          <RotateCcw className="mr-1 h-3 w-3" />
-                          恢复
-                        </Button>
-                      </TableCell>
+              {loading.history ? (
+                <div className="py-8 text-center">加载中...</div>
+              ) : backupHistory.length === 0 ? (
+                <div className="py-8 text-center">暂无备份历史数据</div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>备份名称</TableHead>
+                      <TableHead>类型</TableHead>
+                      <TableHead>状态</TableHead>
+                      <TableHead>大小</TableHead>
+                      <TableHead>完成时间</TableHead>
+                      <TableHead className="text-right">操作</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {backupHistory.slice(0, 3).map((backup) => (
+                      <TableRow key={backup.id}>
+                        <TableCell className="font-medium">{backup.name}</TableCell>
+                        <TableCell>{backup.type}</TableCell>
+                        <TableCell>
+                          <Badge variant={backup.status === "成功" ? "success" : "destructive"}>
+                            {backup.status === "成功" ? (
+                              <CheckCircle className="mr-1 h-3 w-3" />
+                            ) : (
+                              <XCircle className="mr-1 h-3 w-3" />
+                            )}
+                            {backup.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>{backup.size}</TableCell>
+                        <TableCell>{backup.endTime}</TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleOpenRestoreDialog(backup.id)}
+                            disabled={backup.status !== "成功"}
+                          >
+                            <RotateCcw className="mr-1 h-3 w-3" />
+                            恢复
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
             </CardContent>
             <CardFooter>
               <Button variant="outline" size="sm" className="ml-auto" onClick={() => setActiveTab("history")}>
@@ -388,53 +377,59 @@ export default function BackupManagementPage() {
                 </Select>
               </div>
 
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>备份名称</TableHead>
-                    <TableHead>类型</TableHead>
-                    <TableHead>状态</TableHead>
-                    <TableHead>大小</TableHead>
-                    <TableHead>开始时间</TableHead>
-                    <TableHead>结束时间</TableHead>
-                    <TableHead>耗时</TableHead>
-                    <TableHead className="text-right">操作</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {backupHistory.map((backup) => (
-                    <TableRow key={backup.id}>
-                      <TableCell className="font-medium">{backup.name}</TableCell>
-                      <TableCell>{backup.type}</TableCell>
-                      <TableCell>
-                        <Badge variant={backup.status === "成功" ? "success" : "destructive"}>
-                          {backup.status === "成功" ? (
-                            <CheckCircle className="mr-1 h-3 w-3" />
-                          ) : (
-                            <XCircle className="mr-1 h-3 w-3" />
-                          )}
-                          {backup.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>{backup.size}</TableCell>
-                      <TableCell>{backup.startTime}</TableCell>
-                      <TableCell>{backup.endTime}</TableCell>
-                      <TableCell>{backup.duration}</TableCell>
-                      <TableCell className="text-right">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleOpenRestoreDialog(backup.id)}
-                          disabled={backup.status !== "成功"}
-                        >
-                          <RotateCcw className="mr-1 h-3 w-3" />
-                          恢复
-                        </Button>
-                      </TableCell>
+              {loading.history ? (
+                <div className="py-8 text-center">加载中...</div>
+              ) : backupHistory.length === 0 ? (
+                <div className="py-8 text-center">暂无备份历史数据</div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>备份名称</TableHead>
+                      <TableHead>类型</TableHead>
+                      <TableHead>状态</TableHead>
+                      <TableHead>大小</TableHead>
+                      <TableHead>开始时间</TableHead>
+                      <TableHead>结束时间</TableHead>
+                      <TableHead>耗时</TableHead>
+                      <TableHead className="text-right">操作</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {backupHistory.map((backup) => (
+                      <TableRow key={backup.id}>
+                        <TableCell className="font-medium">{backup.name}</TableCell>
+                        <TableCell>{backup.type}</TableCell>
+                        <TableCell>
+                          <Badge variant={backup.status === "成功" ? "success" : "destructive"}>
+                            {backup.status === "成功" ? (
+                              <CheckCircle className="mr-1 h-3 w-3" />
+                            ) : (
+                              <XCircle className="mr-1 h-3 w-3" />
+                            )}
+                            {backup.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>{backup.size}</TableCell>
+                        <TableCell>{backup.startTime}</TableCell>
+                        <TableCell>{backup.endTime}</TableCell>
+                        <TableCell>{backup.duration}</TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleOpenRestoreDialog(backup.id)}
+                            disabled={backup.status !== "成功"}
+                          >
+                            <RotateCcw className="mr-1 h-3 w-3" />
+                            恢复
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -452,42 +447,48 @@ export default function BackupManagementPage() {
               </Button>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>计划名称</TableHead>
-                    <TableHead>备份类型</TableHead>
-                    <TableHead>执行时间</TableHead>
-                    <TableHead>备份目标</TableHead>
-                    <TableHead>保留策略</TableHead>
-                    <TableHead>状态</TableHead>
-                    <TableHead>上次执行</TableHead>
-                    <TableHead>下次执行</TableHead>
-                    <TableHead className="text-right">操作</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {backupSchedules.map((schedule) => (
-                    <TableRow key={schedule.id}>
-                      <TableCell className="font-medium">{schedule.name}</TableCell>
-                      <TableCell>{schedule.type}</TableCell>
-                      <TableCell>{schedule.schedule}</TableCell>
-                      <TableCell>{schedule.target}</TableCell>
-                      <TableCell>{schedule.retention}</TableCell>
-                      <TableCell>
-                        <Badge variant={schedule.status === "启用" ? "success" : "secondary"}>{schedule.status}</Badge>
-                      </TableCell>
-                      <TableCell>{schedule.lastRun}</TableCell>
-                      <TableCell>{schedule.nextRun}</TableCell>
-                      <TableCell className="text-right">
-                        <Button variant="ghost" size="sm">
-                          编辑
-                        </Button>
-                      </TableCell>
+              {loading.schedules ? (
+                <div className="py-8 text-center">加载中...</div>
+              ) : backupSchedules.length === 0 ? (
+                <div className="py-8 text-center">暂无备份计划数据</div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>计划名称</TableHead>
+                      <TableHead>备份类型</TableHead>
+                      <TableHead>执行时间</TableHead>
+                      <TableHead>备份目标</TableHead>
+                      <TableHead>保留策略</TableHead>
+                      <TableHead>状态</TableHead>
+                      <TableHead>上次执行</TableHead>
+                      <TableHead>下次执行</TableHead>
+                      <TableHead className="text-right">操作</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {backupSchedules.map((schedule) => (
+                      <TableRow key={schedule.id}>
+                        <TableCell className="font-medium">{schedule.name}</TableCell>
+                        <TableCell>{schedule.type}</TableCell>
+                        <TableCell>{schedule.schedule}</TableCell>
+                        <TableCell>{schedule.target}</TableCell>
+                        <TableCell>{schedule.retention}</TableCell>
+                        <TableCell>
+                          <Badge variant={schedule.status === "启用" ? "success" : "secondary"}>{schedule.status}</Badge>
+                        </TableCell>
+                        <TableCell>{schedule.lastRun}</TableCell>
+                        <TableCell>{schedule.nextRun}</TableCell>
+                        <TableCell className="text-right">
+                          <Button variant="ghost" size="sm">
+                            编辑
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

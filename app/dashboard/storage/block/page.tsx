@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import {
   BarChart,
   Battery,
@@ -13,6 +13,7 @@ import {
   Server,
   Settings,
   Trash2,
+  AlertTriangle
 } from "lucide-react"
 import { format } from "date-fns"
 
@@ -42,137 +43,59 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 
-// 模拟数据 - 块存储卷
-const volumes = [
-  {
-    id: "vol-1234567890abcdef0",
-    name: "data-volume-01",
-    size: 500,
-    type: "SSD",
-    status: "attached",
-    attachedTo: "node-01",
-    createdAt: new Date(2023, 5, 15),
-    iops: 3000,
-    throughput: "250 MB/s",
-    usedSpace: 320,
-  },
-  {
-    id: "vol-1234567890abcdef1",
-    name: "data-volume-02",
-    size: 1000,
-    type: "SSD",
-    status: "attached",
-    attachedTo: "node-02",
-    createdAt: new Date(2023, 6, 20),
-    iops: 3000,
-    throughput: "250 MB/s",
-    usedSpace: 750,
-  },
-  {
-    id: "vol-1234567890abcdef2",
-    name: "backup-volume-01",
-    size: 2000,
-    type: "HDD",
-    status: "attached",
-    attachedTo: "node-03",
-    createdAt: new Date(2023, 7, 5),
-    iops: 500,
-    throughput: "100 MB/s",
-    usedSpace: 1200,
-  },
-  {
-    id: "vol-1234567890abcdef3",
-    name: "temp-volume-01",
-    size: 200,
-    type: "SSD",
-    status: "available",
-    attachedTo: null,
-    createdAt: new Date(2023, 8, 10),
-    iops: 3000,
-    throughput: "250 MB/s",
-    usedSpace: 0,
-  },
-  {
-    id: "vol-1234567890abcdef4",
-    name: "archive-volume-01",
-    size: 5000,
-    type: "HDD",
-    status: "attached",
-    attachedTo: "node-04",
-    createdAt: new Date(2023, 4, 1),
-    iops: 500,
-    throughput: "100 MB/s",
-    usedSpace: 4200,
-  },
-]
-
-// 模拟数据 - 快照
-const snapshots = [
-  {
-    id: "snap-0987654321fedcba0",
-    volumeId: "vol-1234567890abcdef0",
-    volumeName: "data-volume-01",
-    description: "Daily backup",
-    size: 320,
-    status: "completed",
-    createdAt: new Date(2023, 9, 1),
-  },
-  {
-    id: "snap-0987654321fedcba1",
-    volumeId: "vol-1234567890abcdef1",
-    volumeName: "data-volume-02",
-    description: "Pre-update snapshot",
-    size: 750,
-    status: "completed",
-    createdAt: new Date(2023, 9, 2),
-  },
-  {
-    id: "snap-0987654321fedcba2",
-    volumeId: "vol-1234567890abcdef2",
-    volumeName: "backup-volume-01",
-    description: "Monthly archive",
-    size: 1200,
-    status: "completed",
-    createdAt: new Date(2023, 8, 30),
-  },
-  {
-    id: "snap-0987654321fedcba3",
-    volumeId: "vol-1234567890abcdef0",
-    volumeName: "data-volume-01",
-    description: "Weekly backup",
-    size: 315,
-    status: "completed",
-    createdAt: new Date(2023, 8, 25),
-  },
-  {
-    id: "snap-0987654321fedcba4",
-    volumeId: "vol-1234567890abcdef4",
-    volumeName: "archive-volume-01",
-    description: "Quarterly backup",
-    size: 4200,
-    status: "in-progress",
-    createdAt: new Date(2023, 9, 3),
-  },
-]
-
-// 状态标签颜色映射
-const statusColors = {
-  attached: "green",
-  available: "blue",
-  detaching: "yellow",
-  attaching: "yellow",
-  error: "red",
-  "in-progress": "yellow",
-  completed: "green",
-  failed: "red",
-}
+// 导入 API 和常量
+import { storageApi } from "@/api"
+import { statusColors } from "@/mock/dashboard/constants"
+import { Volume, Snapshot } from "@/mock/dashboard/types"
 
 export default function BlockStoragePage() {
   const [searchVolume, setSearchVolume] = useState("")
   const [searchSnapshot, setSearchSnapshot] = useState("")
   const [selectedVolumeType, setSelectedVolumeType] = useState("all")
   const [selectedSnapshotStatus, setSelectedSnapshotStatus] = useState("all")
+  const [volumes, setVolumes] = useState<Volume[]>([])
+  const [snapshots, setSnapshots] = useState<Snapshot[]>([])
+  const [loading, setLoading] = useState({
+    volumes: true,
+    snapshots: true
+  })
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        // 获取卷数据
+        setLoading(prev => ({ ...prev, volumes: true }))
+        const volumesResponse = await storageApi.getVolumes()
+        if (volumesResponse.success) {
+          setVolumes(volumesResponse.data)
+        } else {
+          setError(volumesResponse.message)
+        }
+        
+        // 获取快照数据
+        setLoading(prev => ({ ...prev, snapshots: true }))
+        const snapshotsResponse = await storageApi.getSnapshots()
+        if (snapshotsResponse.success) {
+          setSnapshots(snapshotsResponse.data)
+        } else {
+          setError(snapshotsResponse.message)
+        }
+      } catch (err) {
+        setError('获取存储数据失败')
+        console.error(err)
+      } finally {
+        setLoading({
+          volumes: false,
+          snapshots: false
+        })
+      }
+    }
+
+    fetchData()
+  }, [])
 
   // 过滤卷
   const filteredVolumes = volumes.filter((volume) => {
@@ -196,7 +119,7 @@ export default function BlockStoragePage() {
   // 计算总存储容量和使用量
   const totalCapacity = volumes.reduce((sum, volume) => sum + volume.size, 0)
   const usedCapacity = volumes.reduce((sum, volume) => sum + volume.usedSpace, 0)
-  const usagePercentage = Math.round((usedCapacity / totalCapacity) * 100)
+  const usagePercentage = Math.round((usedCapacity / totalCapacity) * 100) || 0
 
   return (
     <div className="space-y-6">
@@ -213,6 +136,14 @@ export default function BlockStoragePage() {
           </Button>
         </div>
       </div>
+
+      {error && (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>错误</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
 
       {/* 存储概览卡片 */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -369,49 +300,63 @@ export default function BlockStoragePage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredVolumes.map((volume) => (
-                  <TableRow key={volume.id}>
-                    <TableCell className="font-medium">{volume.name}</TableCell>
-                    <TableCell className="font-mono text-xs">{volume.id}</TableCell>
-                    <TableCell>{volume.size} GB</TableCell>
-                    <TableCell>{volume.type}</TableCell>
-                    <TableCell>
-                      <Badge variant={statusColors[volume.status] as any}>{volume.status}</Badge>
-                    </TableCell>
-                    <TableCell>{volume.attachedTo || "-"}</TableCell>
-                    <TableCell>{format(volume.createdAt, "yyyy-MM-dd")}</TableCell>
-                    <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" className="h-8 w-8 p-0">
-                            <span className="sr-only">打开菜单</span>
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuLabel>操作</DropdownMenuLabel>
-                          <DropdownMenuItem>
-                            <Settings className="mr-2 h-4 w-4" />
-                            <span>详情</span>
-                          </DropdownMenuItem>
-                          <DropdownMenuItem>
-                            <Server className="mr-2 h-4 w-4" />
-                            <span>{volume.status === "attached" ? "卸载" : "挂载"}</span>
-                          </DropdownMenuItem>
-                          <DropdownMenuItem>
-                            <Clock className="mr-2 h-4 w-4" />
-                            <span>创建快照</span>
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem className="text-red-600">
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            <span>删除</span>
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                {loading.volumes ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="h-24 text-center">
+                      加载中...
                     </TableCell>
                   </TableRow>
-                ))}
+                ) : filteredVolumes.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="h-24 text-center">
+                      暂无卷数据
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredVolumes.map((volume) => (
+                    <TableRow key={volume.id}>
+                      <TableCell className="font-medium">{volume.name}</TableCell>
+                      <TableCell className="font-mono text-xs">{volume.id}</TableCell>
+                      <TableCell>{volume.size} GB</TableCell>
+                      <TableCell>{volume.type}</TableCell>
+                      <TableCell>
+                        <Badge variant={statusColors[volume.status] as any}>{volume.status}</Badge>
+                      </TableCell>
+                      <TableCell>{volume.attachedTo || "-"}</TableCell>
+                      <TableCell>{format(volume.createdAt, "yyyy-MM-dd")}</TableCell>
+                      <TableCell className="text-right">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" className="h-8 w-8 p-0">
+                              <span className="sr-only">打开菜单</span>
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuLabel>操作</DropdownMenuLabel>
+                            <DropdownMenuItem>
+                              <Settings className="mr-2 h-4 w-4" />
+                              <span>详情</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem>
+                              <Server className="mr-2 h-4 w-4" />
+                              <span>{volume.status === "attached" ? "卸载" : "挂载"}</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem>
+                              <Clock className="mr-2 h-4 w-4" />
+                              <span>创建快照</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem className="text-red-600">
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              <span>删除</span>
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
               </TableBody>
             </Table>
           </div>
@@ -459,48 +404,62 @@ export default function BlockStoragePage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredSnapshots.map((snapshot) => (
-                  <TableRow key={snapshot.id}>
-                    <TableCell className="font-mono text-xs">{snapshot.id}</TableCell>
-                    <TableCell>{snapshot.volumeName}</TableCell>
-                    <TableCell>{snapshot.description}</TableCell>
-                    <TableCell>{snapshot.size} GB</TableCell>
-                    <TableCell>
-                      <Badge variant={statusColors[snapshot.status] as any}>{snapshot.status}</Badge>
-                    </TableCell>
-                    <TableCell>{format(snapshot.createdAt, "yyyy-MM-dd")}</TableCell>
-                    <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" className="h-8 w-8 p-0">
-                            <span className="sr-only">打开菜单</span>
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuLabel>操作</DropdownMenuLabel>
-                          <DropdownMenuItem>
-                            <Settings className="mr-2 h-4 w-4" />
-                            <span>详情</span>
-                          </DropdownMenuItem>
-                          <DropdownMenuItem>
-                            <HardDrive className="mr-2 h-4 w-4" />
-                            <span>从快照创建卷</span>
-                          </DropdownMenuItem>
-                          <DropdownMenuItem>
-                            <Download className="mr-2 h-4 w-4" />
-                            <span>导出</span>
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem className="text-red-600">
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            <span>删除</span>
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                {loading.snapshots ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="h-24 text-center">
+                      加载中...
                     </TableCell>
                   </TableRow>
-                ))}
+                ) : filteredSnapshots.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="h-24 text-center">
+                      暂无快照数据
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredSnapshots.map((snapshot) => (
+                    <TableRow key={snapshot.id}>
+                      <TableCell className="font-mono text-xs">{snapshot.id}</TableCell>
+                      <TableCell>{snapshot.volumeName}</TableCell>
+                      <TableCell>{snapshot.description}</TableCell>
+                      <TableCell>{snapshot.size} GB</TableCell>
+                      <TableCell>
+                        <Badge variant={statusColors[snapshot.status] as any}>{snapshot.status}</Badge>
+                      </TableCell>
+                      <TableCell>{format(snapshot.createdAt, "yyyy-MM-dd")}</TableCell>
+                      <TableCell className="text-right">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" className="h-8 w-8 p-0">
+                              <span className="sr-only">打开菜单</span>
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuLabel>操作</DropdownMenuLabel>
+                            <DropdownMenuItem>
+                              <Settings className="mr-2 h-4 w-4" />
+                              <span>详情</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem>
+                              <HardDrive className="mr-2 h-4 w-4" />
+                              <span>从快照创建卷</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem>
+                              <Download className="mr-2 h-4 w-4" />
+                              <span>导出</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem className="text-red-600">
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              <span>删除</span>
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
               </TableBody>
             </Table>
           </div>

@@ -1,9 +1,7 @@
 "use client"
 
-import { useState } from "react"
-import { Users, Search, Filter, MoreHorizontal, Plus, UserPlus, Key, Shield } from "lucide-react"
-
-import { users, roles } from "@/mock/dashboard"
+import { useState, useEffect } from "react"
+import { Users, Search, Filter, MoreHorizontal, Plus, UserPlus, Key, Shield, AlertTriangle } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
@@ -30,10 +28,88 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+
+// 导入 API
+import { securityApi } from "@/api"
+import { User, Role } from "@/mock/dashboard/types"
 
 export default function UserManagementPage() {
   const [activeTab, setActiveTab] = useState("users")
   const [isAddUserOpen, setIsAddUserOpen] = useState(false)
+  const [users, setUsers] = useState<User[]>([])
+  const [roles, setRoles] = useState<Role[]>([])
+  const [loading, setLoading] = useState({
+    users: true,
+    roles: true
+  })
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        // 获取用户数据
+        setLoading(prev => ({ ...prev, users: true }))
+        const usersResponse = await securityApi.getUsers()
+        if (usersResponse.success) {
+          setUsers(usersResponse.data)
+        } else {
+          setError(usersResponse.message)
+        }
+        
+        // 获取角色数据
+        setLoading(prev => ({ ...prev, roles: true }))
+        const rolesResponse = await securityApi.getRoles()
+        if (rolesResponse.success) {
+          setRoles(rolesResponse.data)
+        } else {
+          setError(rolesResponse.message)
+        }
+      } catch (err) {
+        setError('获取用户和角色数据失败')
+        console.error(err)
+      } finally {
+        setLoading({
+          users: false,
+          roles: false
+        })
+      }
+    }
+
+    fetchData()
+  }, [])
+
+  const handleAddUser = async (formData: FormData) => {
+    try {
+      const username = formData.get('username') as string
+      const email = formData.get('email') as string
+      const role = formData.get('role') as string
+      
+      if (!username || !email || !role) {
+        setError('请填写所有必填字段')
+        return
+      }
+      
+      const newUser: Omit<User, 'id'> = {
+        username,
+        email,
+        role,
+        status: '活跃',
+        lastLogin: new Date().toISOString().replace('T', ' ').substring(0, 19)
+      }
+      
+      const response = await securityApi.createUser(newUser)
+      if (response.success) {
+        setUsers(prev => [...prev, response.data])
+        setIsAddUserOpen(false)
+      } else {
+        setError(response.message)
+      }
+    } catch (err) {
+      setError('创建用户失败')
+      console.error(err)
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -55,48 +131,69 @@ export default function UserManagementPage() {
                 <DialogTitle>添加新用户</DialogTitle>
                 <DialogDescription>创建新用户并分配角色和权限</DialogDescription>
               </DialogHeader>
-              <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <Label htmlFor="username">用户名</Label>
-                  <Input id="username" placeholder="输入用户名" />
+              <form onSubmit={(e) => {
+                e.preventDefault()
+                handleAddUser(new FormData(e.currentTarget))
+              }}>
+                <div className="space-y-4 py-4">
+                  {error && (
+                    <Alert variant="destructive" className="mb-4">
+                      <AlertTriangle className="h-4 w-4" />
+                      <AlertTitle>错误</AlertTitle>
+                      <AlertDescription>{error}</AlertDescription>
+                    </Alert>
+                  )}
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="username">用户名</Label>
+                    <Input id="username" name="username" placeholder="输入用户名" required />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="email">电子邮箱</Label>
+                    <Input id="email" name="email" type="email" placeholder="输入电子邮箱" required />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="password">密码</Label>
+                    <Input id="password" name="password" type="password" placeholder="输入密码" required />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="confirm-password">确认密码</Label>
+                    <Input id="confirm-password" name="confirmPassword" type="password" placeholder="再次输入密码" required />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="role">角色</Label>
+                    <Select name="role" defaultValue="guest">
+                      <SelectTrigger id="role">
+                        <SelectValue placeholder="选择角色" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="管理员">管理员</SelectItem>
+                        <SelectItem value="操作员">操作员</SelectItem>
+                        <SelectItem value="分析师">分析师</SelectItem>
+                        <SelectItem value="访客">访客</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="email">电子邮箱</Label>
-                  <Input id="email" type="email" placeholder="输入电子邮箱" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="password">密码</Label>
-                  <Input id="password" type="password" placeholder="输入密码" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="confirm-password">确认密码</Label>
-                  <Input id="confirm-password" type="password" placeholder="再次输入密码" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="role">角色</Label>
-                  <Select>
-                    <SelectTrigger id="role">
-                      <SelectValue placeholder="选择角色" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="admin">管理员</SelectItem>
-                      <SelectItem value="operator">操作员</SelectItem>
-                      <SelectItem value="analyst">分析师</SelectItem>
-                      <SelectItem value="guest">访客</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setIsAddUserOpen(false)}>
-                  取消
-                </Button>
-                <Button onClick={() => setIsAddUserOpen(false)}>创建用户</Button>
-              </DialogFooter>
+                <DialogFooter>
+                  <Button variant="outline" type="button" onClick={() => setIsAddUserOpen(false)}>
+                    取消
+                  </Button>
+                  <Button type="submit">创建用户</Button>
+                </DialogFooter>
+              </form>
             </DialogContent>
           </Dialog>
         </div>
       </div>
+
+      {error && (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>错误</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList>
@@ -139,48 +236,54 @@ export default function UserManagementPage() {
               <div className="text-right">操作</div>
             </div>
             <div className="divide-y">
-              {users.map((user) => (
-                <div key={user.id} className="grid grid-cols-6 items-center px-4 py-3 text-sm">
-                  <div className="font-medium">{user.username}</div>
-                  <div>{user.email}</div>
-                  <div>
-                    <Badge variant="outline">{user.role}</Badge>
+              {loading.users ? (
+                <div className="py-8 text-center">加载中...</div>
+              ) : users.length === 0 ? (
+                <div className="py-8 text-center">暂无用户数据</div>
+              ) : (
+                users.map((user) => (
+                  <div key={user.id} className="grid grid-cols-6 items-center px-4 py-3 text-sm">
+                    <div className="font-medium">{user.username}</div>
+                    <div>{user.email}</div>
+                    <div>
+                      <Badge variant="outline">{user.role}</Badge>
+                    </div>
+                    <div>
+                      <Badge variant={user.status === "活跃" ? "success" : "secondary"}>{user.status}</Badge>
+                    </div>
+                    <div>{user.lastLogin}</div>
+                    <div className="flex justify-end">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon">
+                            <MoreHorizontal className="h-4 w-4" />
+                            <span className="sr-only">操作</span>
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuLabel>用户操作</DropdownMenuLabel>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem>
+                            <Shield className="mr-2 h-4 w-4" />
+                            编辑权限
+                          </DropdownMenuItem>
+                          <DropdownMenuItem>
+                            <Key className="mr-2 h-4 w-4" />
+                            重置密码
+                          </DropdownMenuItem>
+                          {user.status === "活跃" ? (
+                            <DropdownMenuItem>锁定用户</DropdownMenuItem>
+                          ) : (
+                            <DropdownMenuItem>解锁用户</DropdownMenuItem>
+                          )}
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem className="text-red-600">删除用户</DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
                   </div>
-                  <div>
-                    <Badge variant={user.status === "活跃" ? "success" : "secondary"}>{user.status}</Badge>
-                  </div>
-                  <div>{user.lastLogin}</div>
-                  <div className="flex justify-end">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon">
-                          <MoreHorizontal className="h-4 w-4" />
-                          <span className="sr-only">操作</span>
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuLabel>用户操作</DropdownMenuLabel>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem>
-                          <Shield className="mr-2 h-4 w-4" />
-                          编辑权限
-                        </DropdownMenuItem>
-                        <DropdownMenuItem>
-                          <Key className="mr-2 h-4 w-4" />
-                          重置密码
-                        </DropdownMenuItem>
-                        {user.status === "活跃" ? (
-                          <DropdownMenuItem>锁定用户</DropdownMenuItem>
-                        ) : (
-                          <DropdownMenuItem>解锁用户</DropdownMenuItem>
-                        )}
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem className="text-red-600">删除用户</DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </div>
         </TabsContent>
@@ -214,39 +317,45 @@ export default function UserManagementPage() {
               <div className="text-right">操作</div>
             </div>
             <div className="divide-y">
-              {roles.map((role) => (
-                <div key={role.id} className="grid grid-cols-5 items-center px-4 py-3 text-sm">
-                  <div className="font-medium">{role.name}</div>
-                  <div>{role.description}</div>
-                  <div>{role.users}</div>
-                  <div>{role.permissions}</div>
-                  <div className="flex justify-end">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon">
-                          <MoreHorizontal className="h-4 w-4" />
-                          <span className="sr-only">操作</span>
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuLabel>角色操作</DropdownMenuLabel>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem>编辑角色</DropdownMenuItem>
-                        <DropdownMenuItem>
-                          <Shield className="mr-2 h-4 w-4" />
-                          管理权限
-                        </DropdownMenuItem>
-                        <DropdownMenuItem>
-                          <Users className="mr-2 h-4 w-4" />
-                          查看用户
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem className="text-red-600">删除角色</DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+              {loading.roles ? (
+                <div className="py-8 text-center">加载中...</div>
+              ) : roles.length === 0 ? (
+                <div className="py-8 text-center">暂无角色数据</div>
+              ) : (
+                roles.map((role) => (
+                  <div key={role.id} className="grid grid-cols-5 items-center px-4 py-3 text-sm">
+                    <div className="font-medium">{role.name}</div>
+                    <div>{role.description}</div>
+                    <div>{role.users}</div>
+                    <div>{role.permissions}</div>
+                    <div className="flex justify-end">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon">
+                            <MoreHorizontal className="h-4 w-4" />
+                            <span className="sr-only">操作</span>
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuLabel>角色操作</DropdownMenuLabel>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem>编辑角色</DropdownMenuItem>
+                          <DropdownMenuItem>
+                            <Shield className="mr-2 h-4 w-4" />
+                            管理权限
+                          </DropdownMenuItem>
+                          <DropdownMenuItem>
+                            <Users className="mr-2 h-4 w-4" />
+                            查看用户
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem className="text-red-600">删除角色</DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </div>
         </TabsContent>

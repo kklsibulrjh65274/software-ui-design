@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Layers, Search, Filter, MoreHorizontal, RefreshCw, ArrowRightLeft } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -18,14 +18,40 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Progress } from "@/components/ui/progress"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 
-// 导入 mock 数据
-import { shards } from "@/mock/dashboard"
+// 导入 API
+import { clusterApi } from "@/api"
+import { Shard } from "@/mock/dashboard/types"
 
 export default function ClusterShardsPage() {
   const [activeTab, setActiveTab] = useState("shards")
   const [isRebalancing, setIsRebalancing] = useState(false)
   const [rebalanceProgress, setRebalanceProgress] = useState(0)
+  const [shards, setShards] = useState<Shard[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const fetchShards = async () => {
+      try {
+        setLoading(true)
+        const response = await clusterApi.getShards()
+        if (response.success) {
+          setShards(response.data)
+        } else {
+          setError(response.message)
+        }
+      } catch (err) {
+        setError('获取分片数据失败')
+        console.error(err)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchShards()
+  }, [])
 
   const handleRebalance = () => {
     setIsRebalancing(true)
@@ -63,6 +89,14 @@ export default function ClusterShardsPage() {
         </div>
       </div>
 
+      {error && (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>错误</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList>
           <TabsTrigger value="shards">分片列表</TabsTrigger>
@@ -93,54 +127,60 @@ export default function ClusterShardsPage() {
               <div className="text-right">操作</div>
             </div>
             <div className="divide-y">
-              {shards.map((shard) => (
-                <div key={shard.id} className="grid grid-cols-7 items-center px-4 py-3 text-sm">
-                  <div className="font-medium">{shard.id}</div>
-                  <div>{shard.range}</div>
-                  <div>{shard.nodeId}</div>
-                  <div>
-                    <Badge variant="success">{shard.status}</Badge>
-                  </div>
-                  <div>{shard.size}</div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <Progress
-                        value={shard.usage}
-                        className="h-2 flex-1"
-                        indicatorClassName={
-                          shard.usage > 80 ? "bg-red-500" : shard.usage > 60 ? "bg-amber-500" : "bg-green-500"
-                        }
-                      />
-                      <span className="text-xs">{shard.usage}%</span>
+              {loading ? (
+                <div className="py-8 text-center">加载中...</div>
+              ) : shards.length === 0 ? (
+                <div className="py-8 text-center">暂无分片数据</div>
+              ) : (
+                shards.map((shard) => (
+                  <div key={shard.id} className="grid grid-cols-7 items-center px-4 py-3 text-sm">
+                    <div className="font-medium">{shard.id}</div>
+                    <div>{shard.range}</div>
+                    <div>{shard.nodeId}</div>
+                    <div>
+                      <Badge variant="success">{shard.status}</Badge>
+                    </div>
+                    <div>{shard.size}</div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <Progress
+                          value={shard.usage}
+                          className="h-2 flex-1"
+                          indicatorClassName={
+                            shard.usage > 80 ? "bg-red-500" : shard.usage > 60 ? "bg-amber-500" : "bg-green-500"
+                          }
+                        />
+                        <span className="text-xs">{shard.usage}%</span>
+                      </div>
+                    </div>
+                    <div className="flex justify-end">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon">
+                            <MoreHorizontal className="h-4 w-4" />
+                            <span className="sr-only">操作</span>
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuLabel>分片操作</DropdownMenuLabel>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem>查看详情</DropdownMenuItem>
+                          <DropdownMenuItem>
+                            <ArrowRightLeft className="mr-2 h-4 w-4" />
+                            迁移分片
+                          </DropdownMenuItem>
+                          <DropdownMenuItem>
+                            <RefreshCw className="mr-2 h-4 w-4" />
+                            重建索引
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem className="text-red-600">删除分片</DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
                   </div>
-                  <div className="flex justify-end">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon">
-                          <MoreHorizontal className="h-4 w-4" />
-                          <span className="sr-only">操作</span>
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuLabel>分片操作</DropdownMenuLabel>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem>查看详情</DropdownMenuItem>
-                        <DropdownMenuItem>
-                          <ArrowRightLeft className="mr-2 h-4 w-4" />
-                          迁移分片
-                        </DropdownMenuItem>
-                        <DropdownMenuItem>
-                          <RefreshCw className="mr-2 h-4 w-4" />
-                          重建索引
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem className="text-red-600">删除分片</DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </div>
         </TabsContent>

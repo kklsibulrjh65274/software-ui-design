@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Server, Search, Filter, MoreHorizontal, Play, Pause, RefreshCw, AlertTriangle } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -19,12 +19,37 @@ import {
 import { Progress } from "@/components/ui/progress"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 
-// 导入 mock 数据
-import { nodes } from "@/mock/dashboard"
+// 导入 API
+import { clusterApi } from "@/api"
+import { Node } from "@/mock/dashboard/types"
 
 export default function ClusterNodesPage() {
   const [activeTab, setActiveTab] = useState("nodes")
   const [selectedNode, setSelectedNode] = useState<string | null>(null)
+  const [nodes, setNodes] = useState<Node[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const fetchNodes = async () => {
+      try {
+        setLoading(true)
+        const response = await clusterApi.getNodes()
+        if (response.success) {
+          setNodes(response.data)
+        } else {
+          setError(response.message)
+        }
+      } catch (err) {
+        setError('获取节点数据失败')
+        console.error(err)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchNodes()
+  }, [])
 
   const handleViewNode = (nodeId: string) => {
     setSelectedNode(nodeId)
@@ -45,6 +70,14 @@ export default function ClusterNodesPage() {
           </Button>
         </div>
       </div>
+
+      {error && (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>错误</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList>
@@ -76,81 +109,87 @@ export default function ClusterNodesPage() {
               <div className="text-right">操作</div>
             </div>
             <div className="divide-y">
-              {nodes.map((node) => (
-                <div key={node.id} className="grid grid-cols-8 items-center px-4 py-3 text-sm">
-                  <div className="font-medium">{node.id}</div>
-                  <div>{node.name}</div>
-                  <div>{node.ip}</div>
-                  <div>{node.role}</div>
-                  <div>
-                    <Badge variant={node.status === "在线" ? "success" : "destructive"}>{node.status}</Badge>
-                  </div>
-                  <div>
-                    {node.status === "在线" ? (
-                      <div className="flex items-center gap-2">
-                        <Progress
-                          value={node.cpu}
-                          className="h-2 flex-1"
-                          indicatorClassName={
-                            node.cpu > 80 ? "bg-red-500" : node.cpu > 60 ? "bg-amber-500" : "bg-green-500"
-                          }
-                        />
-                        <span className="text-xs">{node.cpu}%</span>
-                      </div>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">不可用</span>
-                    )}
-                  </div>
-                  <div>
-                    {node.status === "在线" ? (
-                      <div className="flex items-center gap-2">
-                        <Progress
-                          value={node.memory}
-                          className="h-2 flex-1"
-                          indicatorClassName={
-                            node.memory > 80 ? "bg-red-500" : node.memory > 60 ? "bg-amber-500" : "bg-green-500"
-                          }
-                        />
-                        <span className="text-xs">{node.memory}%</span>
-                      </div>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">不可用</span>
-                    )}
-                  </div>
-                  <div className="flex justify-end">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon">
-                          <MoreHorizontal className="h-4 w-4" />
-                          <span className="sr-only">操作</span>
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuLabel>节点操作</DropdownMenuLabel>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => handleViewNode(node.id)}>查看详情</DropdownMenuItem>
-                        {node.status === "在线" ? (
+              {loading ? (
+                <div className="py-8 text-center">加载中...</div>
+              ) : nodes.length === 0 ? (
+                <div className="py-8 text-center">暂无节点数据</div>
+              ) : (
+                nodes.map((node) => (
+                  <div key={node.id} className="grid grid-cols-8 items-center px-4 py-3 text-sm">
+                    <div className="font-medium">{node.id}</div>
+                    <div>{node.name}</div>
+                    <div>{node.ip}</div>
+                    <div>{node.role}</div>
+                    <div>
+                      <Badge variant={node.status === "在线" ? "success" : "destructive"}>{node.status}</Badge>
+                    </div>
+                    <div>
+                      {node.status === "在线" ? (
+                        <div className="flex items-center gap-2">
+                          <Progress
+                            value={node.cpu}
+                            className="h-2 flex-1"
+                            indicatorClassName={
+                              node.cpu > 80 ? "bg-red-500" : node.cpu > 60 ? "bg-amber-500" : "bg-green-500"
+                            }
+                          />
+                          <span className="text-xs">{node.cpu}%</span>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">不可用</span>
+                      )}
+                    </div>
+                    <div>
+                      {node.status === "在线" ? (
+                        <div className="flex items-center gap-2">
+                          <Progress
+                            value={node.memory}
+                            className="h-2 flex-1"
+                            indicatorClassName={
+                              node.memory > 80 ? "bg-red-500" : node.memory > 60 ? "bg-amber-500" : "bg-green-500"
+                            }
+                          />
+                          <span className="text-xs">{node.memory}%</span>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">不可用</span>
+                      )}
+                    </div>
+                    <div className="flex justify-end">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon">
+                            <MoreHorizontal className="h-4 w-4" />
+                            <span className="sr-only">操作</span>
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuLabel>节点操作</DropdownMenuLabel>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem onClick={() => handleViewNode(node.id)}>查看详情</DropdownMenuItem>
+                          {node.status === "在线" ? (
+                            <DropdownMenuItem>
+                              <Pause className="mr-2 h-4 w-4" />
+                              停止节点
+                            </DropdownMenuItem>
+                          ) : (
+                            <DropdownMenuItem>
+                              <Play className="mr-2 h-4 w-4" />
+                              启动节点
+                            </DropdownMenuItem>
+                          )}
                           <DropdownMenuItem>
-                            <Pause className="mr-2 h-4 w-4" />
-                            停止节点
+                            <RefreshCw className="mr-2 h-4 w-4" />
+                            重启节点
                           </DropdownMenuItem>
-                        ) : (
-                          <DropdownMenuItem>
-                            <Play className="mr-2 h-4 w-4" />
-                            启动节点
-                          </DropdownMenuItem>
-                        )}
-                        <DropdownMenuItem>
-                          <RefreshCw className="mr-2 h-4 w-4" />
-                          重启节点
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem className="text-red-600">移除节点</DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem className="text-red-600">移除节点</DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </div>
         </TabsContent>

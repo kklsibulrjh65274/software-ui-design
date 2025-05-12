@@ -1,9 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Search, Filter, MoreHorizontal, Upload, Download, Trash2, FileText, FolderIcon, FileIcon } from "lucide-react"
-
-import { files } from "@/mock/dashboard"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
@@ -36,6 +34,10 @@ import {
   BreadcrumbList,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+
+// 导入 API
+import { storageApi } from "@/api"
 
 export default function FileStoragePage() {
   const [activeTab, setActiveTab] = useState("browse")
@@ -43,6 +45,30 @@ export default function FileStoragePage() {
   const [uploadProgress, setUploadProgress] = useState(0)
   const [isUploading, setIsUploading] = useState(false)
   const [currentPath, setCurrentPath] = useState("/")
+  const [files, setFiles] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const fetchFiles = async () => {
+      try {
+        setLoading(true)
+        const response = await storageApi.getFiles(currentPath)
+        if (response.success) {
+          setFiles(response.data)
+        } else {
+          setError(response.message)
+        }
+      } catch (err) {
+        setError('获取文件数据失败')
+        console.error(err)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchFiles()
+  }, [currentPath])
 
   const handleUpload = () => {
     setIsUploading(true)
@@ -129,6 +155,14 @@ export default function FileStoragePage() {
         </div>
       </div>
 
+      {error && (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>错误</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList>
           <TabsTrigger value="browse">浏览文件</TabsTrigger>
@@ -186,57 +220,63 @@ export default function FileStoragePage() {
                   <div className="text-right">操作</div>
                 </div>
                 <div className="divide-y">
-                  {files.map((file) => (
-                    <div key={file.id} className="grid grid-cols-6 items-center px-4 py-3 text-sm">
-                      <div className="font-medium flex items-center">
-                        {file.type === "folder" ? (
-                          <FolderIcon className="mr-2 h-4 w-4 text-blue-500" />
-                        ) : (
-                          <FileIcon className="mr-2 h-4 w-4 text-gray-500" />
-                        )}
-                        {file.name}
+                  {loading ? (
+                    <div className="py-8 text-center">加载中...</div>
+                  ) : files.length === 0 ? (
+                    <div className="py-8 text-center">当前目录为空</div>
+                  ) : (
+                    files.map((file) => (
+                      <div key={file.id} className="grid grid-cols-6 items-center px-4 py-3 text-sm">
+                        <div className="font-medium flex items-center">
+                          {file.type === "folder" ? (
+                            <FolderIcon className="mr-2 h-4 w-4 text-blue-500" />
+                          ) : (
+                            <FileIcon className="mr-2 h-4 w-4 text-gray-500" />
+                          )}
+                          {file.name}
+                        </div>
+                        <div>
+                          <Badge variant="outline">
+                            {file.type === "folder" ? "文件夹" : file.name.split(".").pop()?.toUpperCase()}
+                          </Badge>
+                        </div>
+                        <div>{file.size}</div>
+                        <div>{file.items}</div>
+                        <div>{file.modified}</div>
+                        <div className="flex justify-end">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon">
+                                <MoreHorizontal className="h-4 w-4" />
+                                <span className="sr-only">操作</span>
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuLabel>文件操作</DropdownMenuLabel>
+                              <DropdownMenuSeparator />
+                              {file.type === "folder" ? (
+                                <DropdownMenuItem>打开文件夹</DropdownMenuItem>
+                              ) : (
+                                <DropdownMenuItem>预览文件</DropdownMenuItem>
+                              )}
+                              <DropdownMenuItem>
+                                <Download className="mr-2 h-4 w-4" />
+                                下载
+                              </DropdownMenuItem>
+                              <DropdownMenuItem>重命名</DropdownMenuItem>
+                              <DropdownMenuItem>移动</DropdownMenuItem>
+                              <DropdownMenuItem>共享</DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem className="text-red-600">
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                删除
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
                       </div>
-                      <div>
-                        <Badge variant="outline">
-                          {file.type === "folder" ? "文件夹" : file.name.split(".").pop()?.toUpperCase()}
-                        </Badge>
-                      </div>
-                      <div>{file.size}</div>
-                      <div>{file.items}</div>
-                      <div>{file.modified}</div>
-                      <div className="flex justify-end">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon">
-                              <MoreHorizontal className="h-4 w-4" />
-                              <span className="sr-only">操作</span>
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuLabel>文件操作</DropdownMenuLabel>
-                            <DropdownMenuSeparator />
-                            {file.type === "folder" ? (
-                              <DropdownMenuItem>打开文件夹</DropdownMenuItem>
-                            ) : (
-                              <DropdownMenuItem>预览文件</DropdownMenuItem>
-                            )}
-                            <DropdownMenuItem>
-                              <Download className="mr-2 h-4 w-4" />
-                              下载
-                            </DropdownMenuItem>
-                            <DropdownMenuItem>重命名</DropdownMenuItem>
-                            <DropdownMenuItem>移动</DropdownMenuItem>
-                            <DropdownMenuItem>共享</DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem className="text-red-600">
-                              <Trash2 className="mr-2 h-4 w-4" />
-                              删除
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    </div>
-                  ))}
+                    ))
+                  )}
                 </div>
               </div>
             </CardContent>

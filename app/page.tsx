@@ -1,7 +1,5 @@
 "use client"
 
-import type React from "react"
-
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { AlertCircle } from "lucide-react"
@@ -11,6 +9,9 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+
+// 导入配置
+import { config } from "@/config"
 
 export default function LoginPage() {
   const router = useRouter()
@@ -27,6 +28,8 @@ export default function LoginPage() {
     // 模拟登录验证
     setTimeout(() => {
       if (username === "admin" && password === "admin") {
+        // 设置 token
+        localStorage.setItem('token', 'mock-jwt-token')
         router.push("/dashboard")
       } else {
         setError("用户名或密码错误")
@@ -40,7 +43,16 @@ export default function LoginPage() {
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
           <CardTitle className="text-2xl font-bold text-center">分布式融合数据库与存储管理系统</CardTitle>
-          <CardDescription className="text-center">请输入您的账号和密码登录系统</CardDescription>
+          <CardDescription className="text-center">
+            请输入您的账号和密码登录系统
+            {config.api.useMock && (
+              <div className="mt-2">
+                <Badge variant="outline" className="bg-yellow-100 text-yellow-800 border-yellow-200">
+                  开发模式: 使用模拟数据
+                </Badge>
+              </div>
+            )}
+          </CardDescription>
         </CardHeader>
         <form onSubmit={handleLogin}>
           <CardContent className="space-y-4">
@@ -82,3 +94,5 @@ export default function LoginPage() {
     </div>
   )
 }
+
+import { Badge } from "@/components/ui/badge"
