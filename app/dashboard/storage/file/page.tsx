@@ -3,6 +3,8 @@
 import { useState } from "react"
 import { Search, Filter, MoreHorizontal, Upload, Download, Trash2, FileText, FolderIcon, FileIcon } from "lucide-react"
 
+import { files } from "@/mock/dashboard"
+
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -34,57 +36,6 @@ import {
   BreadcrumbList,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
-
-const files = [
-  {
-    id: "folder-001",
-    name: "文档",
-    type: "folder",
-    size: "-",
-    items: 8,
-    modified: "2023-05-08 14:30:22",
-  },
-  {
-    id: "folder-002",
-    name: "图片",
-    type: "folder",
-    size: "-",
-    items: 24,
-    modified: "2023-05-07 10:15:45",
-  },
-  {
-    id: "folder-003",
-    name: "备份",
-    type: "folder",
-    size: "-",
-    items: 5,
-    modified: "2023-05-05 16:42:10",
-  },
-  {
-    id: "file-001",
-    name: "系统架构.pdf",
-    type: "file",
-    size: "2.4 MB",
-    items: "-",
-    modified: "2023-05-10 09:12:33",
-  },
-  {
-    id: "file-002",
-    name: "用户手册.docx",
-    type: "file",
-    size: "1.8 MB",
-    items: "-",
-    modified: "2023-05-09 11:30:15",
-  },
-  {
-    id: "file-003",
-    name: "数据库设计.xlsx",
-    type: "file",
-    size: "3.2 MB",
-    items: "-",
-    modified: "2023-05-08 15:45:20",
-  },
-]
 
 export default function FileStoragePage() {
   const [activeTab, setActiveTab] = useState("browse")
@@ -206,7 +157,6 @@ export default function FileStoragePage() {
                 </Badge>
               </div>
               <CardDescription>当前位置</CardDescription>
-              {/* 将面包屑导航移到CardDescription外部，修复hydration错误 */}
               <Breadcrumb>
                 <BreadcrumbList>
                   <BreadcrumbItem>
