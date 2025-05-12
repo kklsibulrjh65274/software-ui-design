@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import {
   AlertCircle,
   AlertTriangle,
@@ -38,430 +38,10 @@ import {
 } from "@/components/ui/dialog"
 import { DatePickerWithRange } from "@/components/ui/date-range-picker"
 import type { DateRange } from "react-day-picker"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 
-// 模拟日志数据
-const systemLogs = [
-  {
-    id: "log-001",
-    timestamp: "2023-05-10 08:45:12",
-    level: "错误",
-    source: "数据库服务",
-    message: "无法连接到数据库节点 node-05",
-    details: "连接超时，节点可能已下线或网络问题。已尝试重连3次。",
-    traceId: "trace-db-45678",
-  },
-  {
-    id: "log-002",
-    timestamp: "2023-05-10 08:30:45",
-    level: "警告",
-    source: "存储服务",
-    message: "存储节点 node-03 磁盘使用率超过 80%",
-    details: "当前使用率82.5%，触发预警阈值。建议清理不必要数据或扩展存储容量。",
-    traceId: "trace-storage-12345",
-  },
-  {
-    id: "log-003",
-    timestamp: "2023-05-10 08:15:30",
-    level: "信息",
-    source: "系统服务",
-    message: "系统备份任务已完成",
-    details: "备份大小: 2.3GB，耗时: 15分钟，备份位置: /backups/2023-05-10/",
-    traceId: "trace-backup-78901",
-  },
-  {
-    id: "log-004",
-    timestamp: "2023-05-10 08:00:15",
-    level: "信息",
-    source: "用户服务",
-    message: "用户 admin 登录系统",
-    details: "IP地址: 192.168.1.100，浏览器: Chrome 112.0.5615.138，登录时间: 2023-05-10 08:00:15",
-    traceId: "trace-user-23456",
-  },
-  {
-    id: "log-005",
-    timestamp: "2023-05-10 07:45:00",
-    level: "警告",
-    source: "网络服务",
-    message: "检测到网络延迟增加",
-    details: "平均延迟从 5ms 增加到 25ms，可能影响系统性能。建议检查网络设备和连接。",
-    traceId: "trace-network-34567",
-  },
-  {
-    id: "log-006",
-    timestamp: "2023-05-10 07:30:22",
-    level: "错误",
-    source: "数据库服务",
-    message: "查询执行超时: SELECT * FROM large_table WHERE complex_condition",
-    details: "查询ID: query-789012，执行时间超过60秒，已自动终止。建议优化查询或增加索引。",
-    traceId: "trace-db-56789",
-  },
-  {
-    id: "log-007",
-    timestamp: "2023-05-10 07:15:10",
-    level: "信息",
-    source: "系统服务",
-    message: "系统自动更新已完成",
-    details: "更新版本: v2.3.1，更新内容: 安全补丁和性能优化，重启服务: 否",
-    traceId: "trace-system-67890",
-  },
-  {
-    id: "log-008",
-    timestamp: "2023-05-10 07:00:05",
-    level: "调试",
-    source: "API服务",
-    message: "API请求处理时间: 230ms",
-    details: "端点: /api/v1/data，方法: GET，参数: {limit: 100, offset: 0}，响应大小: 45KB",
-    traceId: "trace-api-78901",
-  },
-  {
-    id: "log-009",
-    timestamp: "2023-05-10 06:45:30",
-    level: "信息",
-    source: "调度服务",
-    message: "后台任务已启动: 数据同步",
-    details: "任务ID: task-123456，预计完成时间: 2023-05-10 07:15:30，优先级: 中",
-    traceId: "trace-scheduler-89012",
-  },
-  {
-    id: "log-010",
-    timestamp: "2023-05-10 06:30:15",
-    level: "警告",
-    source: "缓存服务",
-    message: "缓存命中率下降到 65%",
-    details: "正常范围: >85%，建议检查缓存策略或增加缓存容量。可能的原因: 工作负载变化或内存压力。",
-    traceId: "trace-cache-90123",
-  },
-  {
-    id: "log-011",
-    timestamp: "2023-05-10 06:15:00",
-    level: "错误",
-    source: "认证服务",
-    message: "多次失败的登录尝试: user123",
-    details: "5次失败尝试，IP地址: 203.0.113.42，账户已临时锁定30分钟。可能的安全问题。",
-    traceId: "trace-auth-01234",
-  },
-  {
-    id: "log-012",
-    timestamp: "2023-05-10 06:00:45",
-    level: "信息",
-    source: "配置服务",
-    message: "配置更改: 最大连接数",
-    details: "参数: max_connections，旧值: 1000，新值: 1500，生效时间: 立即，操作用户: admin",
-    traceId: "trace-config-12345",
-  },
-  {
-    id: "log-013",
-    timestamp: "2023-05-10 05:45:30",
-    level: "调试",
-    source: "查询优化器",
-    message: "查询计划生成: 复杂查询优化",
-    details: "查询ID: query-345678，表数量: 5，条件数量: 8，选择的索引: idx_timestamp，估计行数: 10,000",
-    traceId: "trace-optimizer-23456",
-  },
-  {
-    id: "log-014",
-    timestamp: "2023-05-10 05:30:15",
-    level: "警告",
-    source: "监控服务",
-    message: "节点 node-07 CPU 使用率超过 90%",
-    details: "当前使用率: 92.3%，持续时间: 5分钟，主要进程: database_server (PID: 1234, CPU: 75%)",
-    traceId: "trace-monitor-34567",
-  },
-  {
-    id: "log-015",
-    timestamp: "2023-05-10 05:15:00",
-    level: "信息",
-    source: "集群服务",
-    message: "新节点加入集群: node-12",
-    details: "节点类型: 计算节点，IP: 10.0.0.12，资源: 16 CPU, 64GB RAM，状态: 初始化中",
-    traceId: "trace-cluster-45678",
-  },
-]
-
-// 模拟数据库日志
-const databaseLogs = [
-  {
-    id: "db-log-001",
-    timestamp: "2023-05-10 08:40:22",
-    level: "错误",
-    source: "PostgreSQL",
-    message: "无法创建索引: 表 'users' 上的 'idx_email'",
-    details: "错误代码: 23505，详情: 重复键违反唯一约束，已存在相同的索引名称。",
-    traceId: "trace-db-12345",
-  },
-  {
-    id: "db-log-002",
-    timestamp: "2023-05-10 08:35:15",
-    level: "警告",
-    source: "MySQL",
-    message: "慢查询检测: 查询执行时间 > 5秒",
-    details: "查询: SELECT * FROM orders JOIN order_items WHERE date > '2023-01-01' AND ...",
-    traceId: "trace-db-23456",
-  },
-  {
-    id: "db-log-003",
-    timestamp: "2023-05-10 08:25:30",
-    level: "信息",
-    source: "MongoDB",
-    message: "集合分片完成: 'products'",
-    details: "分片键: { category: 1, created_at: 1 }，块数量: 12，分布: 4个分片服务器",
-    traceId: "trace-db-34567",
-  },
-  {
-    id: "db-log-004",
-    timestamp: "2023-05-10 08:20:10",
-    level: "调试",
-    source: "Redis",
-    message: "键过期事件: 'session:user:12345'",
-    details: "TTL: 3600秒，大小: 2KB，过期原因: 自然过期",
-    traceId: "trace-db-45678",
-  },
-  {
-    id: "db-log-005",
-    timestamp: "2023-05-10 08:15:45",
-    level: "错误",
-    source: "Elasticsearch",
-    message: "分片分配失败: 索引 'logs-2023-05'",
-    details: "原因: 磁盘空间不足，节点: es-node-03，所需空间: 5GB，可用空间: 2GB",
-    traceId: "trace-db-56789",
-  },
-  {
-    id: "db-log-006",
-    timestamp: "2023-05-10 08:10:30",
-    level: "警告",
-    source: "PostgreSQL",
-    message: "自动清理进程负载过高",
-    details: "表: 'events'，大小: 50GB，死元组: 15M，估计完成时间: 25分钟",
-    traceId: "trace-db-67890",
-  },
-  {
-    id: "db-log-007",
-    timestamp: "2023-05-10 08:05:15",
-    level: "信息",
-    source: "MySQL",
-    message: "InnoDB 缓冲池状态更新",
-    details: "命中率: 98.5%，脏页: 2.3%，读取: 12,500/秒，写入: 3,200/秒",
-    traceId: "trace-db-78901",
-  },
-  {
-    id: "db-log-008",
-    timestamp: "2023-05-10 08:00:00",
-    level: "调试",
-    source: "MongoDB",
-    message: "索引构建进度: 'users.idx_last_login'",
-    details: "进度: 75%，已处理文档: 3.75M，估计剩余时间: 2分钟",
-    traceId: "trace-db-89012",
-  },
-  {
-    id: "db-log-009",
-    timestamp: "2023-05-10 07:55:45",
-    level: "错误",
-    source: "Cassandra",
-    message: "节点通信失败: 'cass-node-05'",
-    details: "超时: 30秒，尝试次数: 3，影响: 读写一致性可能受影响",
-    traceId: "trace-db-90123",
-  },
-  {
-    id: "db-log-010",
-    timestamp: "2023-05-10 07:50:30",
-    level: "警告",
-    source: "Redis",
-    message: "内存使用率接近最大值: 85%",
-    details: "已用: 12.75GB，最大: 15GB，建议: 检查大键或增加内存配置",
-    traceId: "trace-db-01234",
-  },
-]
-
-// 模拟应用日志
-const applicationLogs = [
-  {
-    id: "app-log-001",
-    timestamp: "2023-05-10 08:42:15",
-    level: "错误",
-    source: "API网关",
-    message: "路由解析失败: '/api/v2/analytics'",
-    details: "错误: 找不到匹配的路由配置，请求方法: GET，客户端IP: 192.168.5.25",
-    traceId: "trace-app-12345",
-  },
-  {
-    id: "app-log-002",
-    timestamp: "2023-05-10 08:38:30",
-    level: "警告",
-    source: "用户服务",
-    message: "密码重置请求频率异常: user@example.com",
-    details: "5分钟内3次请求，IP地址: 203.0.113.42，可能的安全问题",
-    traceId: "trace-app-23456",
-  },
-  {
-    id: "app-log-003",
-    timestamp: "2023-05-10 08:33:45",
-    level: "信息",
-    source: "订单服务",
-    message: "大订单处理完成: #ORD-78901",
-    details: "订单金额: ¥25,000，商品数量: 12，处理时间: 2.3秒",
-    traceId: "trace-app-34567",
-  },
-  {
-    id: "app-log-004",
-    timestamp: "2023-05-10 08:28:10",
-    level: "调试",
-    source: "支付服务",
-    message: "支付处理流程追踪",
-    details: "步骤: 验证 -> 授权 -> 捕获 -> 确认，总耗时: 1.2秒，支付提供商: AliPay",
-    traceId: "trace-app-45678",
-  },
-  {
-    id: "app-log-005",
-    timestamp: "2023-05-10 08:23:55",
-    level: "错误",
-    source: "通知服务",
-    message: "推送通知失败: 设备令牌无效",
-    details: "用户ID: 12345，设备类型: iOS，应用版本: 2.3.0，错误代码: INVALID_TOKEN",
-    traceId: "trace-app-56789",
-  },
-  {
-    id: "app-log-006",
-    timestamp: "2023-05-10 08:18:40",
-    level: "警告",
-    source: "库存服务",
-    message: "产品库存不足警告: SKU-78901",
-    details: "产品: 高端笔记本电脑，当前库存: 5，安全库存: 10，建议: 补充库存",
-    traceId: "trace-app-67890",
-  },
-  {
-    id: "app-log-007",
-    timestamp: "2023-05-10 08:13:25",
-    level: "信息",
-    source: "搜索服务",
-    message: "搜索索引重建完成",
-    details: "索引: products_zh，文档数: 1.2M，耗时: 45秒，新增文档: 1,500",
-    traceId: "trace-app-78901",
-  },
-  {
-    id: "app-log-008",
-    timestamp: "2023-05-10 08:08:10",
-    level: "调试",
-    source: "缓存服务",
-    message: "缓存键驱逐事件",
-    details: "键模式: user:profile:*，驱逐原因: LRU策略，驱逐数量: 500，内存释放: 15MB",
-    traceId: "trace-app-89012",
-  },
-  {
-    id: "app-log-009",
-    timestamp: "2023-05-10 08:03:55",
-    level: "错误",
-    source: "文件服务",
-    message: "文件上传失败: 大小超过限制",
-    details: "文件名: large_dataset.csv，大小: 52MB，限制: 50MB，用户: admin@example.com",
-    traceId: "trace-app-90123",
-  },
-  {
-    id: "app-log-010",
-    timestamp: "2023-05-10 07:58:40",
-    level: "警告",
-    source: "认证服务",
-    message: "用户会话即将过期提醒失败",
-    details: "用户ID: 34567，邮件发送失败，原因: 邮箱地址无效，会话将在30分钟后过期",
-    traceId: "trace-app-01234",
-  },
-]
-
-// 模拟安全日志
-const securityLogs = [
-  {
-    id: "sec-log-001",
-    timestamp: "2023-05-10 08:41:30",
-    level: "错误",
-    source: "防火墙",
-    message: "检测到可能的DDoS攻击",
-    details: "目标IP: 203.0.113.10，端口: 443，流量: 1.2Gbps，已激活自动缓解措施",
-    traceId: "trace-sec-12345",
-  },
-  {
-    id: "sec-log-002",
-    timestamp: "2023-05-10 08:36:15",
-    level: "警告",
-    source: "入侵检测系统",
-    message: "检测到可疑的SQL注入尝试",
-    details: "源IP: 198.51.100.23，目标: /login，模式: ' OR 1=1 --，已阻止请求",
-    traceId: "trace-sec-23456",
-  },
-  {
-    id: "sec-log-003",
-    timestamp: "2023-05-10 08:31:00",
-    level: "信息",
-    source: "访问控制",
-    message: "管理员权限变更",
-    details: "用户: admin，操作: 添加权限，权限: SYSTEM_CONFIG_WRITE，操作者: super_admin",
-    traceId: "trace-sec-34567",
-  },
-  {
-    id: "sec-log-004",
-    timestamp: "2023-05-10 08:25:45",
-    level: "调试",
-    source: "证书管理",
-    message: "SSL证书轮换计划",
-    details: "域名: api.example.com，当前证书过期时间: 2023-06-10，计划轮换时间: 2023-06-01",
-    traceId: "trace-sec-45678",
-  },
-  {
-    id: "sec-log-005",
-    timestamp: "2023-05-10 08:20:30",
-    level: "错误",
-    source: "身份提供商",
-    message: "SAML断言验证失败",
-    details: "IdP: corporate-sso，用户: jsmith@example.com，错误: 签名无效，可能的时钟偏差",
-    traceId: "trace-sec-56789",
-  },
-  {
-    id: "sec-log-006",
-    timestamp: "2023-05-10 08:15:15",
-    level: "警告",
-    source: "防火墙",
-    message: "检测到异常端口扫描活动",
-    details: "源IP: 203.0.113.42，扫描端口范围: 1-1024，持续时间: 30秒，已添加到监视列表",
-    traceId: "trace-sec-67890",
-  },
-  {
-    id: "sec-log-007",
-    timestamp: "2023-05-10 08:10:00",
-    level: "信息",
-    source: "安全策略",
-    message: "密码策略更新",
-    details: "变更: 最小长度从8增加到12，必须包含特殊字符，90天后过期，生效时间: 立即",
-    traceId: "trace-sec-78901",
-  },
-  {
-    id: "sec-log-008",
-    timestamp: "2023-05-10 08:04:45",
-    level: "调试",
-    source: "会话管理",
-    message: "会话令牌分析",
-    details: "活动会话: 1,250，平均持续时间: 45分钟，并发用户峰值: 300 (08:00-09:00)",
-    traceId: "trace-sec-89012",
-  },
-  {
-    id: "sec-log-009",
-    timestamp: "2023-05-10 07:59:30",
-    level: "错误",
-    source: "数据保护",
-    message: "敏感数据暴露尝试",
-    details: "用户ID: 45678，尝试访问: /api/admin/users，所需权限: ADMIN_READ，用户权限: USER_READ",
-    traceId: "trace-sec-90123",
-  },
-  {
-    id: "sec-log-010",
-    timestamp: "2023-05-10 07:54:15",
-    level: "警告",
-    source: "地理位置异常",
-    message: "检测到用户登录位置异常",
-    details: "用户: zhang.wei@example.com，通常位置: 北京，当前位置: 悉尼，已要求二次验证",
-    traceId: "trace-sec-01234",
-  },
-]
-
-// 合并所有日志用于搜索
-const allLogs = [...systemLogs, ...databaseLogs, ...applicationLogs, ...securityLogs]
+// 导入 API
+import { systemApi } from "@/api"
 
 // 日志级别图标映射
 const levelIcons = {
@@ -493,6 +73,55 @@ export default function LogsManagementPage() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [isFilterOpen, setIsFilterOpen] = useState(false)
   const [selectedSources, setSelectedSources] = useState<string[]>([])
+  const [logs, setLogs] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  // 获取日志数据
+  useEffect(() => {
+    const fetchLogs = async () => {
+      try {
+        setLoading(true)
+        const params: QueryParams = {}
+        
+        if (searchQuery) {
+          params.search = searchQuery
+        }
+        
+        if (selectedLevels.length < 4) {
+          params.filter = { level: selectedLevels }
+        }
+        
+        if (selectedSources.length > 0) {
+          params.filter = { ...params.filter, source: selectedSources }
+        }
+        
+        const response = await systemApi.getSystemLogs(params)
+        if (response.success) {
+          setLogs(response.data)
+        } else {
+          setError(response.message)
+        }
+      } catch (err) {
+        setError('获取日志数据失败')
+        console.error(err)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchLogs()
+    
+    // 如果启用了实时更新，设置定时器
+    let interval: NodeJS.Timeout | null = null
+    if (isRealtime) {
+      interval = setInterval(fetchLogs, 30000) // 每30秒刷新一次
+    }
+    
+    return () => {
+      if (interval) clearInterval(interval)
+    }
+  }, [searchQuery, selectedLevels, selectedSources, dateRange, isRealtime])
 
   // 日志级别切换
   const toggleLevel = (level: string) => {
@@ -512,26 +141,8 @@ export default function LogsManagementPage() {
     }
   }
 
-  // 获取当前选项卡的日志
-  const getLogsForTab = () => {
-    switch (activeTab) {
-      case "system":
-        return systemLogs
-      case "database":
-        return databaseLogs
-      case "application":
-        return applicationLogs
-      case "security":
-        return securityLogs
-      case "all":
-        return allLogs
-      default:
-        return systemLogs
-    }
-  }
-
   // 过滤日志
-  const filteredLogs = getLogsForTab().filter((log) => {
+  const filteredLogs = logs.filter((log) => {
     // 级别过滤
     if (!selectedLevels.includes(log.level)) {
       return false
@@ -567,7 +178,7 @@ export default function LogsManagementPage() {
   })
 
   // 获取所有可用的源
-  const availableSources = Array.from(new Set(getLogsForTab().map((log) => log.source)))
+  const availableSources = Array.from(new Set(logs.map((log) => log.source)))
 
   // 日志统计
   const logStats = {
@@ -643,6 +254,14 @@ export default function LogsManagementPage() {
           </TooltipProvider>
         </div>
       </div>
+
+      {error && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>错误</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
 
       {/* 日志统计卡片 */}
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
@@ -848,7 +467,13 @@ export default function LogsManagementPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredLogs.length === 0 ? (
+                {loading ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="h-24 text-center">
+                      加载中...
+                    </TableCell>
+                  </TableRow>
+                ) : filteredLogs.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={5} className="h-24 text-center">
                       没有找到匹配的日志记录
