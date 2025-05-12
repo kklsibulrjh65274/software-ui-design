@@ -3,6 +3,9 @@ import { mockResponse, useMock, getMockData } from '@/lib/api/mock-handler'
 import { ApiResponse, PaginatedData, QueryParams } from '@/lib/api/types'
 import { Database, Table } from '@/mock/dashboard/types'
 
+// 导入子模块
+import * as relationalApi from './relational'
+
 // 获取所有数据库
 export const getDatabases = async (params?: QueryParams): Promise<ApiResponse<Database[]>> => {
   if (useMock()) {
@@ -160,3 +163,6 @@ export const executeQuery = async (databaseId: string, query: string): Promise<A
   
   return api.post(`/database/${databaseId}/query`, { query })
 }
+
+// 导出子模块
+export { relationalApi }
