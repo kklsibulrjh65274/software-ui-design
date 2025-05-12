@@ -3,6 +3,8 @@
 import { useState } from "react"
 import { Search, Filter, MoreHorizontal, Shield } from "lucide-react"
 
+import { accessPolicies } from "@/mock/dashboard"
+
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -28,41 +30,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-
-const accessPolicies = [
-  {
-    id: "policy-001",
-    name: "数据库完全访问",
-    type: "数据库",
-    target: "postgres-main",
-    role: "管理员",
-    access: "完全访问",
-  },
-  {
-    id: "policy-002",
-    name: "数据库只读访问",
-    type: "数据库",
-    target: "postgres-main",
-    role: "分析师",
-    access: "只读",
-  },
-  {
-    id: "policy-003",
-    name: "存储管理访问",
-    type: "存储",
-    target: "文件存储",
-    role: "操作员",
-    access: "读写",
-  },
-  {
-    id: "policy-004",
-    name: "系统监控访问",
-    type: "系统",
-    target: "监控面板",
-    role: "操作员",
-    access: "只读",
-  },
-]
 
 export default function AccessControlPage() {
   const [activeTab, setActiveTab] = useState("policies")

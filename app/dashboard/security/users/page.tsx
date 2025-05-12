@@ -3,6 +3,8 @@
 import { useState } from "react"
 import { Users, Search, Filter, MoreHorizontal, Plus, UserPlus, Key, Shield } from "lucide-react"
 
+import { users, roles } from "@/mock/dashboard"
+
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -28,72 +30,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-
-const users = [
-  {
-    id: "user-001",
-    username: "admin",
-    email: "admin@example.com",
-    role: "管理员",
-    status: "活跃",
-    lastLogin: "2023-05-10 08:45:12",
-  },
-  {
-    id: "user-002",
-    username: "operator",
-    email: "operator@example.com",
-    role: "操作员",
-    status: "活跃",
-    lastLogin: "2023-05-09 16:30:45",
-  },
-  {
-    id: "user-003",
-    username: "analyst",
-    email: "analyst@example.com",
-    role: "分析师",
-    status: "活跃",
-    lastLogin: "2023-05-08 14:15:30",
-  },
-  {
-    id: "user-004",
-    username: "guest",
-    email: "guest@example.com",
-    role: "访客",
-    status: "锁定",
-    lastLogin: "2023-04-25 10:20:15",
-  },
-]
-
-const roles = [
-  {
-    id: "role-001",
-    name: "管理员",
-    description: "系统管理员，拥有所有权限",
-    users: 1,
-    permissions: "所有权限",
-  },
-  {
-    id: "role-002",
-    name: "操作员",
-    description: "系统操作员，可以执行大部分操作",
-    users: 1,
-    permissions: "读写权限，无管理权限",
-  },
-  {
-    id: "role-003",
-    name: "分析师",
-    description: "数据分析师，主要进行数据查询和分析",
-    users: 1,
-    permissions: "只读权限，可执行查询",
-  },
-  {
-    id: "role-004",
-    name: "访客",
-    description: "系统访客，只能查看有限信息",
-    users: 1,
-    permissions: "有限的只读权限",
-  },
-]
 
 export default function UserManagementPage() {
   const [activeTab, setActiveTab] = useState("users")
