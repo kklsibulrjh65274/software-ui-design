@@ -1,0 +1,21 @@
+{
+  "name": "分布式融合数据库与存储管理系统",
+  "description": "一个现代化的分布式数据库与存储管理系统，支持关系型、时序型、向量型和地理空间型数据库管理",
+  "version": "1.0.0",
+  "author": "Bolt Team",
+  "license": "MIT",
+  "settings": {
+    "formatOnSave": true,
+    "lintOnSave": true,
+    "defaultBranch": "main",
+    "apiMocking": true
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "test": "jest",
+    "format": "prettier --write \"**/*.{js,ts,tsx,json,md}\""
+  }
+}
