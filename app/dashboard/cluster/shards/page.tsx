@@ -19,53 +19,8 @@ import {
 import { Progress } from "@/components/ui/progress"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
-const shards = [
-  {
-    id: "shard-01",
-    range: "0-1023",
-    nodeId: "node-01",
-    status: "活跃",
-    size: "245 GB",
-    usage: 62,
-    replicas: 2,
-  },
-  {
-    id: "shard-02",
-    range: "1024-2047",
-    nodeId: "node-02",
-    status: "活跃",
-    size: "312 GB",
-    usage: 78,
-    replicas: 2,
-  },
-  {
-    id: "shard-03",
-    range: "2048-3071",
-    nodeId: "node-03",
-    status: "活跃",
-    size: "178 GB",
-    usage: 45,
-    replicas: 2,
-  },
-  {
-    id: "shard-04",
-    range: "3072-4095",
-    nodeId: "node-04",
-    status: "活跃",
-    size: "203 GB",
-    usage: 51,
-    replicas: 2,
-  },
-  {
-    id: "shard-05",
-    range: "4096-5119",
-    nodeId: "node-01",
-    status: "活跃",
-    size: "267 GB",
-    usage: 67,
-    replicas: 2,
-  },
-]
+// 导入 mock 数据
+import { shards } from "@/mock/dashboard"
 
 export default function ClusterShardsPage() {
   const [activeTab, setActiveTab] = useState("shards")
