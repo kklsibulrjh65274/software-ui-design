@@ -68,16 +68,6 @@ export const request = async <T = any>(
   config: AxiosRequestConfig
 ): Promise<T> => {
   try {
-    // 确保 URL 是有效的
-    if (config.url) {
-      try {
-        // 如果是相对路径，使用 baseURL 构建完整 URL
-        new URL(config.url.startsWith('http') ? config.url : `${config.api.baseUrl}${config.url}`)
-      } catch (e) {
-        throw new Error(`Invalid URL: ${config.url}`)
-      }
-    }
-    
     const response: AxiosResponse<T> = await apiClient(config)
     return response.data
   } catch (error) {
