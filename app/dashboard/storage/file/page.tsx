@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Search, Filter, MoreHorizontal, Upload, Download, Trash2, FileText, FolderIcon, FileIcon } from "lucide-react"
+import { Search, Filter, MoreHorizontal, Upload, Download, Trash2, FileText, FolderIcon, FileIcon, AlertTriangle } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"

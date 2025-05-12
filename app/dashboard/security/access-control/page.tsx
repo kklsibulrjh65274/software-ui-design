@@ -135,7 +135,7 @@ export default function AccessControlPage() {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="resource-type">资源类型</Label>
-                    <Select name="resource-type" defaultValue="database">
+                    <Select name="resource-type" defaultValue="数据库">
                       <SelectTrigger id="resource-type">
                         <SelectValue placeholder="选择资源类型" />
                       </SelectTrigger>
