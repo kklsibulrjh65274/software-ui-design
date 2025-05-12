@@ -1,0 +1,86 @@
+// 数据库相关的 mock 数据
+export const databases = [
+  { id: "postgres-main", name: "主数据库", charset: "UTF-8", collation: "en_US.UTF-8", size: "1.2 TB", tables: 42 },
+  {
+    id: "postgres-replica",
+    name: "副本数据库",
+    charset: "UTF-8",
+    collation: "en_US.UTF-8",
+    size: "1.1 TB",
+    tables: 42,
+  },
+  { id: "postgres-dev", name: "开发数据库", charset: "UTF-8", collation: "en_US.UTF-8", size: "800 GB", tables: 38 },
+  { id: "postgres-test", name: "测试数据库", charset: "UTF-8", collation: "en_US.UTF-8", size: "750 GB", tables: 35 },
+  {
+    id: "postgres-analytics",
+    name: "分析数据库",
+    charset: "UTF-8",
+    collation: "en_US.UTF-8",
+    size: "2.1 TB",
+    tables: 28,
+  },
+]
+
+export const tables = [
+  {
+    name: "users",
+    database: "postgres-main",
+    type: "关系型",
+    fields: 12,
+    rows: "1.2M",
+    size: "245 MB",
+    indexes: 3,
+  },
+  {
+    name: "orders",
+    database: "postgres-main",
+    type: "关系型",
+    fields: 15,
+    rows: "5.8M",
+    size: "1.2 GB",
+    indexes: 4,
+  },
+  {
+    name: "products",
+    database: "postgres-main",
+    type: "关系型",
+    fields: 18,
+    rows: "250K",
+    size: "180 MB",
+    indexes: 2,
+  },
+  {
+    name: "metrics",
+    database: "timeseries-01",
+    type: "时序型",
+    fields: 8,
+    rows: "45M",
+    size: "3.5 GB",
+    indexes: 2,
+  },
+  {
+    name: "embeddings",
+    database: "vector-search",
+    type: "向量型",
+    fields: 5,
+    rows: "1.5M",
+    size: "2.8 GB",
+    indexes: 1,
+  },
+]
+
+export const performanceData = [
+  { name: "00:00", cpu: 65, memory: 55, disk: 40, network: 70 },
+  { name: "01:00", cpu: 70, memory: 60, disk: 45, network: 65 },
+  { name: "02:00", cpu: 60, memory: 65, disk: 50, network: 60 },
+  { name: "03:00", cpu: 80, memory: 70, disk: 55, network: 75 },
+  { name: "04:00", cpu: 75, memory: 75, disk: 60, network: 80 },
+  { name: "05:00", cpu: 70, memory: 80, disk: 65, network: 85 },
+  { name: "06:00", cpu: 65, memory: 75, disk: 70, network: 80 },
+  { name: "07:00", cpu: 60, memory: 70, disk: 75, network: 75 },
+  { name: "08:00", cpu: 55, memory: 65, disk: 70, network: 70 },
+  { name: "09:00", cpu: 50, memory: 60, disk: 65, network: 65 },
+  { name: "10:00", cpu: 55, memory: 55, disk: 60, network: 60 },
+  { name: "11:00", cpu: 60, memory: 50, disk: 55, network: 55 },
+  { name: "12:00", cpu: 65, memory: 55, disk: 50, network: 60 },
+]
