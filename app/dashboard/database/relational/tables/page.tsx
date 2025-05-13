@@ -32,7 +32,9 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Label } from "@/components/ui/label"
+import { Checkbox } from "@/components/ui/checkbox"
+import { useRouter } from "next/navigation"
 import {
   Dialog,
   DialogContent,
@@ -42,9 +44,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { Label } from "@/components/ui/label"
-import { Checkbox } from "@/components/ui/checkbox"
-import { useRouter } from "next/navigation"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 
 // 导入 API
 import { databaseApi, dataModelApi } from "@/api"
@@ -54,10 +54,9 @@ export default function RelationalTablesPage() {
   const [searchTable, setSearchTable] = useState("")
   const [selectedDatabase, setSelectedDatabase] = useState<string | null>(null)
   const [selectedTable, setSelectedTable] = useState<string | null>(null)
-  const [tables, setTables] = useState<any[]>([])
   const [tableStructure, setTableStructure] = useState<any[]>([])
   const [tableIndexes, setTableIndexes] = useState<any[]>([])
-  const [databases, setDatabases] = useState<any[]>([])
+  const [tables, setTables] = useState<any[]>([])
   const [loading, setLoading] = useState({
     databases: true,
     tables: false,
@@ -65,6 +64,7 @@ export default function RelationalTablesPage() {
     indexes: false
   })
   const [error, setError] = useState<string | null>(null)
+  const [databases, setDatabases] = useState<any[]>([])
   const [isCreateTableOpen, setIsCreateTableOpen] = useState(false)
   const [isCreateIndexOpen, setIsCreateIndexOpen] = useState(false)
   const [isAddFieldOpen, setIsAddFieldOpen] = useState(false)
