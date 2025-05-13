@@ -1,7 +1,7 @@
 "use client"
 
-import { useState } from "react"
-import { Map, Search, Filter, MoreHorizontal, Play, Layers } from "lucide-react"
+import { useState, useEffect } from "react"
+import { Map, Search, Filter, MoreHorizontal, Play, Layers, AlertTriangle } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -19,12 +19,10 @@ import {
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 
-const geospatialDatabases = [
-  { id: "geo-analytics", name: "地理分析库", tables: 12, size: "320 GB", status: "正常" },
-  { id: "geo-locations", name: "位置数据库", tables: 8, size: "180 GB", status: "正常" },
-  { id: "geo-boundaries", name: "边界数据库", tables: 5, size: "420 GB", status: "警告" },
-]
+// 导入 API
+import { geospatialApi } from "@/api"
 
 export default function GeospatialDatabasePage() {
   const [activeTab, setActiveTab] = useState("databases")
@@ -32,21 +30,52 @@ export default function GeospatialDatabasePage() {
     "SELECT name, ST_AsText(geom) FROM cities WHERE ST_DWithin(geom, ST_MakePoint(116.4, 39.9), 50000);",
   )
   const [queryResult, setQueryResult] = useState<any>(null)
+  const [databases, setDatabases] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [queryLoading, setQueryLoading] = useState(false)
 
-  const handleExecuteQuery = () => {
-    // 模拟查询结果
-    setQueryResult({
-      columns: ["name", "type", "coordinates"],
-      rows: [
-        { name: "北京市", type: "POINT", coordinates: "116.4074, 39.9042" },
-        { name: "昌平区", type: "POINT", coordinates: "116.2312, 40.2207" },
-        { name: "海淀区", type: "POINT", coordinates: "116.2980, 39.9592" },
-        { name: "朝阳区", type: "POINT", coordinates: "116.4845, 39.9484" },
-        { name: "丰台区", type: "POINT", coordinates: "116.2871, 39.8585" },
-      ],
-      executionTime: "0.042 秒",
-      rowCount: 5,
-    })
+  // 获取地理空间数据库列表
+  useEffect(() => {
+    const fetchDatabases = async () => {
+      try {
+        setLoading(true)
+        const response = await geospatialApi.getGeospatialDatabases()
+        if (response.success) {
+          setDatabases(response.data)
+        } else {
+          setError(response.message)
+        }
+      } catch (err) {
+        setError('获取地理空间数据库失败')
+        console.error(err)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchDatabases()
+  }, [])
+
+  const handleExecuteQuery = async () => {
+    try {
+      setQueryLoading(true)
+      setError(null)
+      
+      // 使用 API 执行空间查询
+      const response = await geospatialApi.executeGeospatialQuery("geo-analytics", geoQuery)
+      
+      if (response.success) {
+        setQueryResult(response.data)
+      } else {
+        setError(response.message)
+      }
+    } catch (err) {
+      setError('执行空间查询失败')
+      console.error(err)
+    } finally {
+      setQueryLoading(false)
+    }
   }
 
   return (
@@ -63,6 +92,14 @@ export default function GeospatialDatabasePage() {
           </Button>
         </div>
       </div>
+
+      {error && (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>错误</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList>
@@ -93,33 +130,45 @@ export default function GeospatialDatabasePage() {
               <div className="text-right">操作</div>
             </div>
             <div className="divide-y">
-              {geospatialDatabases.map((db) => (
-                <div key={db.id} className="grid grid-cols-5 items-center px-4 py-3 text-sm">
-                  <div className="font-medium">{db.id}</div>
-                  <div>{db.name}</div>
-                  <div>{db.tables}</div>
-                  <div>{db.size}</div>
-                  <div className="flex justify-end">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon">
-                          <MoreHorizontal className="h-4 w-4" />
-                          <span className="sr-only">操作</span>
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuLabel>数据库操作</DropdownMenuLabel>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem>查看表</DropdownMenuItem>
-                        <DropdownMenuItem>备份</DropdownMenuItem>
-                        <DropdownMenuItem>复制</DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem className="text-red-600">删除</DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
+              {loading ? (
+                <div className="py-8 text-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+                  <p className="text-muted-foreground">加载中...</p>
                 </div>
-              ))}
+              ) : databases.length === 0 ? (
+                <div className="py-8 text-center">
+                  <Map className="mx-auto h-12 w-12 text-muted-foreground mb-2" />
+                  <p className="text-muted-foreground">暂无地理空间数据库</p>
+                </div>
+              ) : (
+                databases.map((db) => (
+                  <div key={db.id} className="grid grid-cols-5 items-center px-4 py-3 text-sm">
+                    <div className="font-medium">{db.id}</div>
+                    <div>{db.name}</div>
+                    <div>{db.tables}</div>
+                    <div>{db.size}</div>
+                    <div className="flex justify-end">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon">
+                            <MoreHorizontal className="h-4 w-4" />
+                            <span className="sr-only">操作</span>
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuLabel>数据库操作</DropdownMenuLabel>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem>查看表</DropdownMenuItem>
+                          <DropdownMenuItem>备份</DropdownMenuItem>
+                          <DropdownMenuItem>复制</DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem className="text-red-600">删除</DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </TabsContent>
@@ -142,7 +191,7 @@ export default function GeospatialDatabasePage() {
                   <SelectValue placeholder="选择数据库" />
                 </SelectTrigger>
                 <SelectContent>
-                  {geospatialDatabases.map((db) => (
+                  {databases.map((db) => (
                     <SelectItem key={db.id} value={db.id}>
                       {db.name} ({db.id})
                     </SelectItem>
@@ -276,7 +325,7 @@ export default function GeospatialDatabasePage() {
                     <SelectValue placeholder="选择数据库" />
                   </SelectTrigger>
                   <SelectContent>
-                    {geospatialDatabases.map((db) => (
+                    {databases.map((db) => (
                       <SelectItem key={db.id} value={db.id}>
                         {db.name} ({db.id})
                       </SelectItem>
@@ -296,9 +345,18 @@ export default function GeospatialDatabasePage() {
               </div>
 
               <div className="flex justify-end">
-                <Button onClick={handleExecuteQuery}>
-                  <Play className="mr-2 h-4 w-4" />
-                  执行查询
+                <Button onClick={handleExecuteQuery} disabled={queryLoading}>
+                  {queryLoading ? (
+                    <>
+                      <Play className="mr-2 h-4 w-4 animate-spin" />
+                      执行中...
+                    </>
+                  ) : (
+                    <>
+                      <Play className="mr-2 h-4 w-4" />
+                      执行查询
+                    </>
+                  )}
                 </Button>
               </div>
 
@@ -306,7 +364,7 @@ export default function GeospatialDatabasePage() {
                 <div className="space-y-4">
                   <div className="flex items-center justify-between text-sm">
                     <div>
-                      查询结果: <span className="font-medium">{queryResult.rowCount} 行</span>
+                      查询结果: <span className="font-medium">{queryResult.rowCount || queryResult.rows?.length || 0} 行</span>
                     </div>
                     <div>
                       执行时间: <span className="font-medium">{queryResult.executionTime}</span>
@@ -348,7 +406,7 @@ export default function GeospatialDatabasePage() {
                     <SelectValue placeholder="选择数据库" />
                   </SelectTrigger>
                   <SelectContent>
-                    {geospatialDatabases.map((db) => (
+                    {databases.map((db) => (
                       <SelectItem key={db.id} value={db.id}>
                         {db.name} ({db.id})
                       </SelectItem>
@@ -367,7 +425,20 @@ export default function GeospatialDatabasePage() {
                     <SelectItem value="rivers">河流 (rivers)</SelectItem>
                   </SelectContent>
                 </Select>
-                <Button variant="outline">加载数据</Button>
+                <Button variant="outline" onClick={async () => {
+                  try {
+                    setLoading(true)
+                    const response = await geospatialApi.getMapVisualizationData("geo-analytics", "cities")
+                    if (!response.success) {
+                      setError(response.message)
+                    }
+                  } catch (err) {
+                    setError('加载地图数据失败')
+                    console.error(err)
+                  } finally {
+                    setLoading(false)
+                  }
+                }}>加载数据</Button>
               </div>
 
               <div className="border rounded-md h-[500px] flex items-center justify-center bg-muted/20">

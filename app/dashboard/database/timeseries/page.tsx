@@ -1,7 +1,7 @@
 "use client"
 
-import { useState } from "react"
-import { Clock, Search, Filter, MoreHorizontal, Play } from "lucide-react"
+import { useState, useEffect } from "react"
+import { Clock, Search, Filter, MoreHorizontal, Play, AlertTriangle } from "lucide-react"
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
 
 import { Button } from "@/components/ui/button"
@@ -20,29 +20,10 @@ import {
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 
-const timeseriesDatabases = [
-  { id: "timeseries-01", name: "监控数据库", retention: "30天", series: 156, points: "1.2B", status: "正常" },
-  { id: "timeseries-02", name: "日志数据库", retention: "90天", series: 78, points: "3.5B", status: "警告" },
-  { id: "timeseries-03", name: "传感器数据库", retention: "365天", series: 245, points: "5.7B", status: "正常" },
-  { id: "timeseries-04", name: "指标数据库", retention: "180天", series: 124, points: "2.3B", status: "正常" },
-]
-
-const sampleData = [
-  { time: "00:00", value: 42 },
-  { time: "01:00", value: 38 },
-  { time: "02:00", value: 35 },
-  { time: "03:00", value: 32 },
-  { time: "04:00", value: 30 },
-  { time: "05:00", value: 34 },
-  { time: "06:00", value: 45 },
-  { time: "07:00", value: 58 },
-  { time: "08:00", value: 72 },
-  { time: "09:00", value: 78 },
-  { time: "10:00", value: 82 },
-  { time: "11:00", value: 85 },
-  { time: "12:00", value: 86 },
-]
+// 导入 API
+import { timeseriesApi } from "@/api"
 
 export default function TimeseriesDatabasePage() {
   const [activeTab, setActiveTab] = useState("databases")
@@ -50,14 +31,52 @@ export default function TimeseriesDatabasePage() {
     "SELECT mean(cpu_usage) FROM system_metrics WHERE time >= now() - 12h GROUP BY time(1h)",
   )
   const [queryResult, setQueryResult] = useState<any>(null)
+  const [databases, setDatabases] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [queryLoading, setQueryLoading] = useState(false)
 
-  const handleExecuteQuery = () => {
-    // 模拟查询结果
-    setQueryResult({
-      data: sampleData,
-      executionTime: "0.034 秒",
-      pointCount: sampleData.length,
-    })
+  // 获取时序数据库列表
+  useEffect(() => {
+    const fetchDatabases = async () => {
+      try {
+        setLoading(true)
+        const response = await timeseriesApi.getTimeseriesDatabases()
+        if (response.success) {
+          setDatabases(response.data)
+        } else {
+          setError(response.message)
+        }
+      } catch (err) {
+        setError('获取时序数据库失败')
+        console.error(err)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchDatabases()
+  }, [])
+
+  const handleExecuteQuery = async () => {
+    try {
+      setQueryLoading(true)
+      setError(null)
+      
+      // 使用 API 执行时序查询
+      const response = await timeseriesApi.executeTimeseriesQuery("timeseries-01", timeQuery)
+      
+      if (response.success) {
+        setQueryResult(response.data)
+      } else {
+        setError(response.message)
+      }
+    } catch (err) {
+      setError('执行时序查询失败')
+      console.error(err)
+    } finally {
+      setQueryLoading(false)
+    }
   }
 
   return (
@@ -74,6 +93,14 @@ export default function TimeseriesDatabasePage() {
           </Button>
         </div>
       </div>
+
+      {error && (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>错误</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList>
@@ -104,34 +131,46 @@ export default function TimeseriesDatabasePage() {
               <div className="text-right">操作</div>
             </div>
             <div className="divide-y">
-              {timeseriesDatabases.map((db) => (
-                <div key={db.id} className="grid grid-cols-6 items-center px-4 py-3 text-sm">
-                  <div className="font-medium">{db.id}</div>
-                  <div>{db.name}</div>
-                  <div>{db.retention}</div>
-                  <div>{db.series}</div>
-                  <div>{db.points}</div>
-                  <div className="flex justify-end">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon">
-                          <MoreHorizontal className="h-4 w-4" />
-                          <span className="sr-only">操作</span>
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuLabel>数据库操作</DropdownMenuLabel>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem>查看序列</DropdownMenuItem>
-                        <DropdownMenuItem>修改保留策略</DropdownMenuItem>
-                        <DropdownMenuItem>备份</DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem className="text-red-600">删除</DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
+              {loading ? (
+                <div className="py-8 text-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+                  <p className="text-muted-foreground">加载中...</p>
                 </div>
-              ))}
+              ) : databases.length === 0 ? (
+                <div className="py-8 text-center">
+                  <Clock className="mx-auto h-12 w-12 text-muted-foreground mb-2" />
+                  <p className="text-muted-foreground">暂无时序数据库</p>
+                </div>
+              ) : (
+                databases.map((db) => (
+                  <div key={db.id} className="grid grid-cols-6 items-center px-4 py-3 text-sm">
+                    <div className="font-medium">{db.id}</div>
+                    <div>{db.name}</div>
+                    <div>{db.retention}</div>
+                    <div>{db.series}</div>
+                    <div>{db.points}</div>
+                    <div className="flex justify-end">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon">
+                            <MoreHorizontal className="h-4 w-4" />
+                            <span className="sr-only">操作</span>
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuLabel>数据库操作</DropdownMenuLabel>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem>查看序列</DropdownMenuItem>
+                          <DropdownMenuItem>修改保留策略</DropdownMenuItem>
+                          <DropdownMenuItem>备份</DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem className="text-red-600">删除</DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </TabsContent>
@@ -154,7 +193,7 @@ export default function TimeseriesDatabasePage() {
                   <SelectValue placeholder="选择数据库" />
                 </SelectTrigger>
                 <SelectContent>
-                  {timeseriesDatabases.map((db) => (
+                  {databases.map((db) => (
                     <SelectItem key={db.id} value={db.id}>
                       {db.name} ({db.id})
                     </SelectItem>
@@ -170,112 +209,119 @@ export default function TimeseriesDatabasePage() {
               <CardDescription>监控数据库 (timeseries-01) 中的时间序列</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="rounded-md border">
-                <div className="grid grid-cols-5 border-b bg-muted/50 px-4 py-3 text-sm font-medium">
-                  <div>序列名称</div>
-                  <div>标签</div>
-                  <div>数据类型</div>
-                  <div>数据点数</div>
-                  <div className="text-right">操作</div>
+              {loading ? (
+                <div className="py-8 text-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+                  <p className="text-muted-foreground">加载中...</p>
                 </div>
-                <div className="divide-y">
-                  <div className="grid grid-cols-5 items-center px-4 py-3 text-sm">
-                    <div className="font-medium">cpu_usage</div>
-                    <div>
-                      <Badge variant="outline" className="mr-1">
-                        host=server01
-                      </Badge>
-                      <Badge variant="outline">region=cn-east</Badge>
-                    </div>
-                    <div>float</div>
-                    <div>2.5M</div>
-                    <div className="flex justify-end gap-2">
-                      <Button variant="ghost" size="sm">
-                        查看
-                      </Button>
-                      <Button variant="ghost" size="sm">
-                        图表
-                      </Button>
-                    </div>
+              ) : (
+                <div className="rounded-md border">
+                  <div className="grid grid-cols-5 border-b bg-muted/50 px-4 py-3 text-sm font-medium">
+                    <div>序列名称</div>
+                    <div>标签</div>
+                    <div>数据类型</div>
+                    <div>数据点数</div>
+                    <div className="text-right">操作</div>
                   </div>
-                  <div className="grid grid-cols-5 items-center px-4 py-3 text-sm">
-                    <div className="font-medium">memory_usage</div>
-                    <div>
-                      <Badge variant="outline" className="mr-1">
-                        host=server01
-                      </Badge>
-                      <Badge variant="outline">region=cn-east</Badge>
+                  <div className="divide-y">
+                    <div className="grid grid-cols-5 items-center px-4 py-3 text-sm">
+                      <div className="font-medium">cpu_usage</div>
+                      <div>
+                        <Badge variant="outline" className="mr-1">
+                          host=server01
+                        </Badge>
+                        <Badge variant="outline">region=cn-east</Badge>
+                      </div>
+                      <div>float</div>
+                      <div>2.5M</div>
+                      <div className="flex justify-end gap-2">
+                        <Button variant="ghost" size="sm">
+                          查看
+                        </Button>
+                        <Button variant="ghost" size="sm">
+                          图表
+                        </Button>
+                      </div>
                     </div>
-                    <div>float</div>
-                    <div>2.5M</div>
-                    <div className="flex justify-end gap-2">
-                      <Button variant="ghost" size="sm">
-                        查看
-                      </Button>
-                      <Button variant="ghost" size="sm">
-                        图表
-                      </Button>
+                    <div className="grid grid-cols-5 items-center px-4 py-3 text-sm">
+                      <div className="font-medium">memory_usage</div>
+                      <div>
+                        <Badge variant="outline" className="mr-1">
+                          host=server01
+                        </Badge>
+                        <Badge variant="outline">region=cn-east</Badge>
+                      </div>
+                      <div>float</div>
+                      <div>2.5M</div>
+                      <div className="flex justify-end gap-2">
+                        <Button variant="ghost" size="sm">
+                          查看
+                        </Button>
+                        <Button variant="ghost" size="sm">
+                          图表
+                        </Button>
+                      </div>
                     </div>
-                  </div>
-                  <div className="grid grid-cols-5 items-center px-4 py-3 text-sm">
-                    <div className="font-medium">disk_usage</div>
-                    <div>
-                      <Badge variant="outline" className="mr-1">
-                        host=server01
-                      </Badge>
-                      <Badge variant="outline">region=cn-east</Badge>
+                    <div className="grid grid-cols-5 items-center px-4 py-3 text-sm">
+                      <div className="font-medium">disk_usage</div>
+                      <div>
+                        <Badge variant="outline" className="mr-1">
+                          host=server01
+                        </Badge>
+                        <Badge variant="outline">region=cn-east</Badge>
+                      </div>
+                      <div>float</div>
+                      <div>2.5M</div>
+                      <div className="flex justify-end gap-2">
+                        <Button variant="ghost" size="sm">
+                          查看
+                        </Button>
+                        <Button variant="ghost" size="sm">
+                          图表
+                        </Button>
+                      </div>
                     </div>
-                    <div>float</div>
-                    <div>2.5M</div>
-                    <div className="flex justify-end gap-2">
-                      <Button variant="ghost" size="sm">
-                        查看
-                      </Button>
-                      <Button variant="ghost" size="sm">
-                        图表
-                      </Button>
+                    <div className="grid grid-cols-5 items-center px-4 py-3 text-sm">
+                      <div className="font-medium">network_in</div>
+                      <div>
+                        <Badge variant="outline" className="mr-1">
+                          host=server01
+                        </Badge>
+                        <Badge variant="outline">region=cn-east</Badge>
+                      </div>
+                      <div>float</div>
+                      <div>2.5M</div>
+                      <div className="flex justify-end gap-2">
+                        <Button variant="ghost" size="sm">
+                          查看
+                        </Button>
+                        <Button variant="ghost" size="sm">
+                          图表
+                        </Button>
+                      </div>
                     </div>
-                  </div>
-                  <div className="grid grid-cols-5 items-center px-4 py-3 text-sm">
-                    <div className="font-medium">network_in</div>
-                    <div>
-                      <Badge variant="outline" className="mr-1">
-                        host=server01
-                      </Badge>
-                      <Badge variant="outline">region=cn-east</Badge>
-                    </div>
-                    <div>float</div>
-                    <div>2.5M</div>
-                    <div className="flex justify-end gap-2">
-                      <Button variant="ghost" size="sm">
-                        查看
-                      </Button>
-                      <Button variant="ghost" size="sm">
-                        图表
-                      </Button>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-5 items-center px-4 py-3 text-sm">
-                    <div className="font-medium">network_out</div>
-                    <div>
-                      <Badge variant="outline" className="mr-1">
-                        host=server01
-                      </Badge>
-                      <Badge variant="outline">region=cn-east</Badge>
-                    </div>
-                    <div>float</div>
-                    <div>2.5M</div>
-                    <div className="flex justify-end gap-2">
-                      <Button variant="ghost" size="sm">
-                        查看
-                      </Button>
-                      <Button variant="ghost" size="sm">
-                        图表
-                      </Button>
+                    <div className="grid grid-cols-5 items-center px-4 py-3 text-sm">
+                      <div className="font-medium">network_out</div>
+                      <div>
+                        <Badge variant="outline" className="mr-1">
+                          host=server01
+                        </Badge>
+                        <Badge variant="outline">region=cn-east</Badge>
+                      </div>
+                      <div>float</div>
+                      <div>2.5M</div>
+                      <div className="flex justify-end gap-2">
+                        <Button variant="ghost" size="sm">
+                          查看
+                        </Button>
+                        <Button variant="ghost" size="sm">
+                          图表
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -293,7 +339,7 @@ export default function TimeseriesDatabasePage() {
                     <SelectValue placeholder="选择数据库" />
                   </SelectTrigger>
                   <SelectContent>
-                    {timeseriesDatabases.map((db) => (
+                    {databases.map((db) => (
                       <SelectItem key={db.id} value={db.id}>
                         {db.name} ({db.id})
                       </SelectItem>
@@ -313,9 +359,18 @@ export default function TimeseriesDatabasePage() {
               </div>
 
               <div className="flex justify-end">
-                <Button onClick={handleExecuteQuery}>
-                  <Play className="mr-2 h-4 w-4" />
-                  执行查询
+                <Button onClick={handleExecuteQuery} disabled={queryLoading}>
+                  {queryLoading ? (
+                    <>
+                      <Play className="mr-2 h-4 w-4 animate-spin" />
+                      执行中...
+                    </>
+                  ) : (
+                    <>
+                      <Play className="mr-2 h-4 w-4" />
+                      执行查询
+                    </>
+                  )}
                 </Button>
               </div>
 

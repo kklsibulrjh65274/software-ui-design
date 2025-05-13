@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Upload, Download, CheckCircle, XCircle, Clock } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -12,92 +12,90 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 
-const importTasks = [
-  {
-    id: "import-001",
-    name: "用户数据导入",
-    source: "users.csv",
-    target: "users",
-    database: "postgres-main",
-    status: "完成",
-    progress: 100,
-    rows: 15420,
-    created: "2023-05-09 14:30:22",
-  },
-  {
-    id: "import-002",
-    name: "产品数据导入",
-    source: "products.csv",
-    target: "products",
-    database: "postgres-main",
-    status: "进行中",
-    progress: 65,
-    rows: 8500,
-    created: "2023-05-10 09:15:45",
-  },
-  {
-    id: "import-003",
-    name: "订单历史导入",
-    source: "orders_history.csv",
-    target: "orders",
-    database: "postgres-main",
-    status: "失败",
-    progress: 32,
-    rows: 25000,
-    created: "2023-05-08 16:42:10",
-  },
-]
-
-const exportTasks = [
-  {
-    id: "export-001",
-    name: "用户数据导出",
-    source: "users",
-    target: "users_backup.csv",
-    database: "postgres-main",
-    status: "完成",
-    progress: 100,
-    rows: 15420,
-    created: "2023-05-07 11:20:15",
-  },
-  {
-    id: "export-002",
-    name: "月度报表导出",
-    source: "monthly_report",
-    target: "report_2023_04.xlsx",
-    database: "postgres-analytics",
-    status: "完成",
-    progress: 100,
-    rows: 1250,
-    created: "2023-05-01 08:30:00",
-  },
-]
+// 导入 API
+import { dataModelApi } from "@/api"
 
 export default function ImportExportPage() {
   const [activeTab, setActiveTab] = useState("import")
   const [importProgress, setImportProgress] = useState(0)
   const [isImporting, setIsImporting] = useState(false)
+  const [tasks, setTasks] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  const handleStartImport = () => {
-    setIsImporting(true)
-    setImportProgress(0)
-
-    // 模拟导入进度
-    const interval = setInterval(() => {
-      setImportProgress((prev) => {
-        const next = prev + 5
-        if (next >= 100) {
-          clearInterval(interval)
-          setTimeout(() => {
-            setIsImporting(false)
-          }, 1000)
-          return 100
+  useEffect(() => {
+    const fetchTasks = async () => {
+      try {
+        setLoading(true)
+        const response = await dataModelApi.getImportExportTasks()
+        if (response.success) {
+          setTasks(response.data)
+        } else {
+          setError(response.message)
         }
-        return next
-      })
-    }, 500)
+      } catch (err) {
+        setError('获取任务数据失败')
+        console.error(err)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchTasks()
+  }, [])
+
+  const handleStartImport = async () => {
+    try {
+      setIsImporting(true)
+      setImportProgress(0)
+      
+      // 模拟导入进度
+      const interval = setInterval(() => {
+        setImportProgress((prev) => {
+          const next = prev + 5
+          if (next >= 100) {
+            clearInterval(interval)
+            setTimeout(() => {
+              setIsImporting(false)
+              // 创建导入任务
+              const createImportTask = async () => {
+                try {
+                  const response = await dataModelApi.importData("postgres-main", "users", {
+                    name: "用户数据导入",
+                    file: { name: "users.csv" }
+                  })
+                  
+                  if (response.success) {
+                    // 添加新任务到列表
+                    setTasks(prev => [response.data, ...prev])
+                  } else {
+                    setError(response.message)
+                  }
+                } catch (err) {
+                  setError('创建导入任务失败')
+                  console.error(err)
+                }
+              }
+              
+              createImportTask()
+            }, 1000)
+            return 100
+          }
+          return next
+        })
+      }, 500)
+    } catch (err) {
+      setError('启动导入失败')
+      console.error(err)
+      setIsImporting(false)
+    }
   }
+
+  // 过滤导入和导出任务
+  const importTasks = tasks.filter(task => task.id.startsWith('import'))
+  const exportTasks = tasks.filter(task => task.id.startsWith('export'))
 
   return (
     <div className="space-y-6">
@@ -107,6 +105,14 @@ export default function ImportExportPage() {
           <p className="text-muted-foreground">导入和导出数据库数据</p>
         </div>
       </div>
+
+      {error && (
+        <Alert variant="destructive">
+          <XCircle className="h-4 w-4" />
+          <AlertTitle>错误</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList>
@@ -349,7 +355,25 @@ export default function ImportExportPage() {
             </CardContent>
             <CardFooter className="flex justify-end gap-2">
               <Button variant="outline">取消</Button>
-              <Button>
+              <Button onClick={async () => {
+                try {
+                  const response = await dataModelApi.exportData("postgres-main", {
+                    name: "数据导出",
+                    source: "users",
+                    filename: "export.csv"
+                  })
+                  
+                  if (response.success) {
+                    // 添加新任务到列表
+                    setTasks(prev => [response.data, ...prev])
+                  } else {
+                    setError(response.message)
+                  }
+                } catch (err) {
+                  setError('创建导出任务失败')
+                  console.error(err)
+                }
+              }}>
                 <Download className="mr-2 h-4 w-4" />
                 开始导出
               </Button>
@@ -364,46 +388,54 @@ export default function ImportExportPage() {
               <CardDescription>数据导入任务状态</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="rounded-md border">
-                <div className="grid grid-cols-7 border-b bg-muted/50 px-4 py-3 text-sm font-medium">
-                  <div>任务名称</div>
-                  <div>源文件</div>
-                  <div>目标表</div>
-                  <div>数据库</div>
-                  <div>状态</div>
-                  <div>进度</div>
-                  <div>创建时间</div>
+              {loading ? (
+                <div className="flex justify-center items-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
                 </div>
-                <div className="divide-y">
-                  {importTasks.map((task) => (
-                    <div key={task.id} className="grid grid-cols-7 items-center px-4 py-3 text-sm">
-                      <div className="font-medium">{task.name}</div>
-                      <div>{task.source}</div>
-                      <div>{task.target}</div>
-                      <div>{task.database}</div>
-                      <div>
-                        <Badge
-                          variant={
-                            task.status === "完成" ? "success" : task.status === "进行中" ? "default" : "destructive"
-                          }
-                        >
-                          {task.status === "完成" && <CheckCircle className="mr-1 h-3 w-3" />}
-                          {task.status === "进行中" && <Clock className="mr-1 h-3 w-3" />}
-                          {task.status === "失败" && <XCircle className="mr-1 h-3 w-3" />}
-                          {task.status}
-                        </Badge>
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <Progress value={task.progress} className="h-2 flex-1" />
-                          <span className="text-xs">{task.progress}%</span>
+              ) : importTasks.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">暂无导入任务</div>
+              ) : (
+                <div className="rounded-md border">
+                  <div className="grid grid-cols-7 border-b bg-muted/50 px-4 py-3 text-sm font-medium">
+                    <div>任务名称</div>
+                    <div>源文件</div>
+                    <div>目标表</div>
+                    <div>数据库</div>
+                    <div>状态</div>
+                    <div>进度</div>
+                    <div>创建时间</div>
+                  </div>
+                  <div className="divide-y">
+                    {importTasks.map((task) => (
+                      <div key={task.id} className="grid grid-cols-7 items-center px-4 py-3 text-sm">
+                        <div className="font-medium">{task.name}</div>
+                        <div>{task.source}</div>
+                        <div>{task.target}</div>
+                        <div>{task.database}</div>
+                        <div>
+                          <Badge
+                            variant={
+                              task.status === "完成" ? "success" : task.status === "进行中" ? "default" : "destructive"
+                            }
+                          >
+                            {task.status === "完成" && <CheckCircle className="mr-1 h-3 w-3" />}
+                            {task.status === "进行中" && <Clock className="mr-1 h-3 w-3" />}
+                            {task.status === "失败" && <XCircle className="mr-1 h-3 w-3" />}
+                            {task.status}
+                          </Badge>
                         </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <Progress value={task.progress} className="h-2 flex-1" />
+                            <span className="text-xs">{task.progress}%</span>
+                          </div>
+                        </div>
+                        <div>{task.created}</div>
                       </div>
-                      <div>{task.created}</div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
             </CardContent>
           </Card>
 
@@ -413,46 +445,54 @@ export default function ImportExportPage() {
               <CardDescription>数据导出任务状态</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="rounded-md border">
-                <div className="grid grid-cols-7 border-b bg-muted/50 px-4 py-3 text-sm font-medium">
-                  <div>任务名称</div>
-                  <div>源表</div>
-                  <div>目标文件</div>
-                  <div>数据库</div>
-                  <div>状态</div>
-                  <div>进度</div>
-                  <div>创建时间</div>
+              {loading ? (
+                <div className="flex justify-center items-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
                 </div>
-                <div className="divide-y">
-                  {exportTasks.map((task) => (
-                    <div key={task.id} className="grid grid-cols-7 items-center px-4 py-3 text-sm">
-                      <div className="font-medium">{task.name}</div>
-                      <div>{task.source}</div>
-                      <div>{task.target}</div>
-                      <div>{task.database}</div>
-                      <div>
-                        <Badge
-                          variant={
-                            task.status === "完成" ? "success" : task.status === "进行中" ? "default" : "destructive"
-                          }
-                        >
-                          {task.status === "完成" && <CheckCircle className="mr-1 h-3 w-3" />}
-                          {task.status === "进行中" && <Clock className="mr-1 h-3 w-3" />}
-                          {task.status === "失败" && <XCircle className="mr-1 h-3 w-3" />}
-                          {task.status}
-                        </Badge>
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <Progress value={task.progress} className="h-2 flex-1" />
-                          <span className="text-xs">{task.progress}%</span>
+              ) : exportTasks.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">暂无导出任务</div>
+              ) : (
+                <div className="rounded-md border">
+                  <div className="grid grid-cols-7 border-b bg-muted/50 px-4 py-3 text-sm font-medium">
+                    <div>任务名称</div>
+                    <div>源表</div>
+                    <div>目标文件</div>
+                    <div>数据库</div>
+                    <div>状态</div>
+                    <div>进度</div>
+                    <div>创建时间</div>
+                  </div>
+                  <div className="divide-y">
+                    {exportTasks.map((task) => (
+                      <div key={task.id} className="grid grid-cols-7 items-center px-4 py-3 text-sm">
+                        <div className="font-medium">{task.name}</div>
+                        <div>{task.source}</div>
+                        <div>{task.target}</div>
+                        <div>{task.database}</div>
+                        <div>
+                          <Badge
+                            variant={
+                              task.status === "完成" ? "success" : task.status === "进行中" ? "default" : "destructive"
+                            }
+                          >
+                            {task.status === "完成" && <CheckCircle className="mr-1 h-3 w-3" />}
+                            {task.status === "进行中" && <Clock className="mr-1 h-3 w-3" />}
+                            {task.status === "失败" && <XCircle className="mr-1 h-3 w-3" />}
+                            {task.status}
+                          </Badge>
                         </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <Progress value={task.progress} className="h-2 flex-1" />
+                            <span className="text-xs">{task.progress}%</span>
+                          </div>
+                        </div>
+                        <div>{task.created}</div>
                       </div>
-                      <div>{task.created}</div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

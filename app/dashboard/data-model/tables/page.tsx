@@ -1,7 +1,7 @@
 "use client"
 
-import { useState } from "react"
-import { Table, Search, Filter, MoreHorizontal, Plus, Database } from "lucide-react"
+import { useState, useEffect } from "react"
+import { Table, Search, Filter, MoreHorizontal, Plus, Database, AlertTriangle } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -17,61 +17,72 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 
-const tables = [
-  {
-    name: "users",
-    database: "postgres-main",
-    type: "关系型",
-    fields: 12,
-    rows: "1.2M",
-    size: "245 MB",
-    indexes: 3,
-  },
-  {
-    name: "orders",
-    database: "postgres-main",
-    type: "关系型",
-    fields: 15,
-    rows: "5.8M",
-    size: "1.2 GB",
-    indexes: 4,
-  },
-  {
-    name: "products",
-    database: "postgres-main",
-    type: "关系型",
-    fields: 18,
-    rows: "250K",
-    size: "180 MB",
-    indexes: 2,
-  },
-  {
-    name: "metrics",
-    database: "timeseries-01",
-    type: "时序型",
-    fields: 8,
-    rows: "45M",
-    size: "3.5 GB",
-    indexes: 2,
-  },
-  {
-    name: "embeddings",
-    database: "vector-search",
-    type: "向量型",
-    fields: 5,
-    rows: "1.5M",
-    size: "2.8 GB",
-    indexes: 1,
-  },
-]
+// 导入 API
+import { dataModelApi, databaseApi } from "@/api"
 
 export default function DataModelTablesPage() {
   const [activeTab, setActiveTab] = useState("tables")
   const [selectedTable, setSelectedTable] = useState<string | null>(null)
+  const [selectedDatabase, setSelectedDatabase] = useState<string | null>(null)
+  const [tableStructure, setTableStructure] = useState<any[]>([])
+  const [tables, setTables] = useState<any[]>([])
+  const [loading, setLoading] = useState({
+    tables: true,
+    structure: false
+  })
+  const [error, setError] = useState<string | null>(null)
 
-  const handleViewTable = (tableName: string) => {
+  // 获取表列表
+  useEffect(() => {
+    const fetchTables = async () => {
+      try {
+        setLoading(prev => ({ ...prev, tables: true }))
+        const response = await databaseApi.getTables()
+        if (response.success) {
+          setTables(response.data)
+        } else {
+          setError(response.message)
+        }
+      } catch (err) {
+        setError('获取表数据失败')
+        console.error(err)
+      } finally {
+        setLoading(prev => ({ ...prev, tables: false }))
+      }
+    }
+
+    fetchTables()
+  }, [])
+
+  // 获取表结构
+  useEffect(() => {
+    const fetchTableStructure = async () => {
+      if (!selectedTable || !selectedDatabase) return
+      
+      try {
+        setLoading(prev => ({ ...prev, structure: true }))
+        const response = await dataModelApi.getTableStructure(selectedDatabase, selectedTable)
+        if (response.success) {
+          setTableStructure(response.data)
+        } else {
+          setError(response.message)
+        }
+      } catch (err) {
+        setError('获取表结构失败')
+        console.error(err)
+      } finally {
+        setLoading(prev => ({ ...prev, structure: false }))
+      }
+    }
+
+    fetchTableStructure()
+  }, [selectedTable, selectedDatabase])
+
+  const handleViewTable = (tableName: string, databaseId: string) => {
     setSelectedTable(tableName)
+    setSelectedDatabase(databaseId)
     setActiveTab("structure")
   }
 
@@ -89,6 +100,14 @@ export default function DataModelTablesPage() {
           </Button>
         </div>
       </div>
+
+      {error && (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>错误</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList>
@@ -132,37 +151,49 @@ export default function DataModelTablesPage() {
               <div className="text-right">操作</div>
             </div>
             <div className="divide-y">
-              {tables.map((table) => (
-                <div key={table.name} className="grid grid-cols-7 items-center px-4 py-3 text-sm">
-                  <div className="font-medium">{table.name}</div>
-                  <div>{table.database}</div>
-                  <div>
-                    <Badge variant="outline">{table.type}</Badge>
-                  </div>
-                  <div>{table.fields}</div>
-                  <div>{table.rows}</div>
-                  <div>{table.size}</div>
-                  <div className="flex justify-end">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon">
-                          <MoreHorizontal className="h-4 w-4" />
-                          <span className="sr-only">操作</span>
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuLabel>表操作</DropdownMenuLabel>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => handleViewTable(table.name)}>查看结构</DropdownMenuItem>
-                        <DropdownMenuItem>查看数据</DropdownMenuItem>
-                        <DropdownMenuItem>管理索引</DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem className="text-red-600">删除表</DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
+              {loading.tables ? (
+                <div className="py-8 text-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+                  <p className="text-muted-foreground">加载中...</p>
                 </div>
-              ))}
+              ) : tables.length === 0 ? (
+                <div className="py-8 text-center">
+                  <Table className="mx-auto h-12 w-12 text-muted-foreground mb-2" />
+                  <p className="text-muted-foreground">暂无表数据</p>
+                </div>
+              ) : (
+                tables.map((table) => (
+                  <div key={table.name} className="grid grid-cols-7 items-center px-4 py-3 text-sm">
+                    <div className="font-medium">{table.name}</div>
+                    <div>{table.database}</div>
+                    <div>
+                      <Badge variant="outline">{table.type}</Badge>
+                    </div>
+                    <div>{table.fields}</div>
+                    <div>{table.rows}</div>
+                    <div>{table.size}</div>
+                    <div className="flex justify-end">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon">
+                            <MoreHorizontal className="h-4 w-4" />
+                            <span className="sr-only">操作</span>
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuLabel>表操作</DropdownMenuLabel>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem onClick={() => handleViewTable(table.name, table.database)}>查看结构</DropdownMenuItem>
+                          <DropdownMenuItem>查看数据</DropdownMenuItem>
+                          <DropdownMenuItem>管理索引</DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem className="text-red-600">删除表</DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </TabsContent>
@@ -197,306 +228,44 @@ export default function DataModelTablesPage() {
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
-                      <div className="rounded-md border">
-                        <div className="grid grid-cols-6 border-b bg-muted/50 px-4 py-3 text-sm font-medium">
-                          <div>字段名</div>
-                          <div>数据类型</div>
-                          <div>长度/精度</div>
-                          <div>允许空值</div>
-                          <div>默认值</div>
-                          <div className="text-right">操作</div>
+                      {loading.structure ? (
+                        <div className="py-8 text-center">
+                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+                          <p className="text-muted-foreground">加载中...</p>
                         </div>
-                        <div className="divide-y">
-                          {table.name === "users" && (
-                            <>
-                              <div className="grid grid-cols-6 items-center px-4 py-3 text-sm">
-                                <div className="font-medium">id</div>
-                                <div>integer</div>
-                                <div>-</div>
-                                <div>否</div>
-                                <div>自增</div>
-                                <div className="flex justify-end gap-2">
-                                  <Button variant="ghost" size="sm">
-                                    编辑
-                                  </Button>
-                                </div>
-                              </div>
-                              <div className="grid grid-cols-6 items-center px-4 py-3 text-sm">
-                                <div className="font-medium">username</div>
-                                <div>varchar</div>
-                                <div>50</div>
-                                <div>否</div>
-                                <div>-</div>
-                                <div className="flex justify-end gap-2">
-                                  <Button variant="ghost" size="sm">
-                                    编辑
-                                  </Button>
-                                </div>
-                              </div>
-                              <div className="grid grid-cols-6 items-center px-4 py-3 text-sm">
-                                <div className="font-medium">email</div>
-                                <div>varchar</div>
-                                <div>100</div>
-                                <div>否</div>
-                                <div>-</div>
-                                <div className="flex justify-end gap-2">
-                                  <Button variant="ghost" size="sm">
-                                    编辑
-                                  </Button>
-                                </div>
-                              </div>
-                              <div className="grid grid-cols-6 items-center px-4 py-3 text-sm">
-                                <div className="font-medium">password_hash</div>
-                                <div>varchar</div>
-                                <div>255</div>
-                                <div>否</div>
-                                <div>-</div>
-                                <div className="flex justify-end gap-2">
-                                  <Button variant="ghost" size="sm">
-                                    编辑
-                                  </Button>
-                                </div>
-                              </div>
-                              <div className="grid grid-cols-6 items-center px-4 py-3 text-sm">
-                                <div className="font-medium">created_at</div>
-                                <div>timestamp</div>
-                                <div>-</div>
-                                <div>否</div>
-                                <div>CURRENT_TIMESTAMP</div>
-                                <div className="flex justify-end gap-2">
-                                  <Button variant="ghost" size="sm">
-                                    编辑
-                                  </Button>
-                                </div>
-                              </div>
-                            </>
-                          )}
-
-                          {table.name === "products" && (
-                            <>
-                              <div className="grid grid-cols-6 items-center px-4 py-3 text-sm">
-                                <div className="font-medium">id</div>
-                                <div>integer</div>
-                                <div>-</div>
-                                <div>否</div>
-                                <div>自增</div>
-                                <div className="flex justify-end gap-2">
-                                  <Button variant="ghost" size="sm">
-                                    编辑
-                                  </Button>
-                                </div>
-                              </div>
-                              <div className="grid grid-cols-6 items-center px-4 py-3 text-sm">
-                                <div className="font-medium">name</div>
-                                <div>varchar</div>
-                                <div>100</div>
-                                <div>否</div>
-                                <div>-</div>
-                                <div className="flex justify-end gap-2">
-                                  <Button variant="ghost" size="sm">
-                                    编辑
-                                  </Button>
-                                </div>
-                              </div>
-                              <div className="grid grid-cols-6 items-center px-4 py-3 text-sm">
-                                <div className="font-medium">description</div>
-                                <div>text</div>
-                                <div>-</div>
-                                <div>是</div>
-                                <div>-</div>
-                                <div className="flex justify-end gap-2">
-                                  <Button variant="ghost" size="sm">
-                                    编辑
-                                  </Button>
-                                </div>
-                              </div>
-                              <div className="grid grid-cols-6 items-center px-4 py-3 text-sm">
-                                <div className="font-medium">price</div>
-                                <div>decimal</div>
-                                <div>10,2</div>
-                                <div>否</div>
-                                <div>0.00</div>
-                                <div className="flex justify-end gap-2">
-                                  <Button variant="ghost" size="sm">
-                                    编辑
-                                  </Button>
-                                </div>
-                              </div>
-                              <div className="grid grid-cols-6 items-center px-4 py-3 text-sm">
-                                <div className="font-medium">category_id</div>
-                                <div>integer</div>
-                                <div>-</div>
-                                <div>否</div>
-                                <div>-</div>
-                                <div className="flex justify-end gap-2">
-                                  <Button variant="ghost" size="sm">
-                                    编辑
-                                  </Button>
-                                </div>
-                              </div>
-                            </>
-                          )}
-
-                          {table.name === "metrics" && (
-                            <>
-                              <div className="grid grid-cols-6 items-center px-4 py-3 text-sm">
-                                <div className="font-medium">time</div>
-                                <div>timestamp</div>
-                                <div>-</div>
-                                <div>否</div>
-                                <div>-</div>
-                                <div className="flex justify-end gap-2">
-                                  <Button variant="ghost" size="sm">
-                                    编辑
-                                  </Button>
-                                </div>
-                              </div>
-                              <div className="grid grid-cols-6 items-center px-4 py-3 text-sm">
-                                <div className="font-medium">host</div>
-                                <div>varchar</div>
-                                <div>50</div>
-                                <div>否</div>
-                                <div>-</div>
-                                <div className="flex justify-end gap-2">
-                                  <Button variant="ghost" size="sm">
-                                    编辑
-                                  </Button>
-                                </div>
-                              </div>
-                              <div className="grid grid-cols-6 items-center px-4 py-3 text-sm">
-                                <div className="font-medium">cpu_usage</div>
-                                <div>float</div>
-                                <div>-</div>
-                                <div>是</div>
-                                <div>-</div>
-                                <div className="flex justify-end gap-2">
-                                  <Button variant="ghost" size="sm">
-                                    编辑
-                                  </Button>
-                                </div>
-                              </div>
-                              <div className="grid grid-cols-6 items-center px-4 py-3 text-sm">
-                                <div className="font-medium">memory_usage</div>
-                                <div>float</div>
-                                <div>-</div>
-                                <div>是</div>
-                                <div>-</div>
-                                <div className="flex justify-end gap-2">
-                                  <Button variant="ghost" size="sm">
-                                    编辑
-                                  </Button>
-                                </div>
-                              </div>
-                            </>
-                          )}
-
-                          {table.name === "embeddings" && (
-                            <>
-                              <div className="grid grid-cols-6 items-center px-4 py-3 text-sm">
-                                <div className="font-medium">id</div>
-                                <div>integer</div>
-                                <div>-</div>
-                                <div>否</div>
-                                <div>自增</div>
-                                <div className="flex justify-end gap-2">
-                                  <Button variant="ghost" size="sm">
-                                    编辑
-                                  </Button>
-                                </div>
-                              </div>
-                              <div className="grid grid-cols-6 items-center px-4 py-3 text-sm">
-                                <div className="font-medium">text</div>
-                                <div>text</div>
-                                <div>-</div>
-                                <div>否</div>
-                                <div>-</div>
-                                <div className="flex justify-end gap-2">
-                                  <Button variant="ghost" size="sm">
-                                    编辑
-                                  </Button>
-                                </div>
-                              </div>
-                              <div className="grid grid-cols-6 items-center px-4 py-3 text-sm">
-                                <div className="font-medium">embedding</div>
-                                <div>vector</div>
-                                <div>1536</div>
-                                <div>否</div>
-                                <div>-</div>
-                                <div className="flex justify-end gap-2">
-                                  <Button variant="ghost" size="sm">
-                                    编辑
-                                  </Button>
-                                </div>
-                              </div>
-                            </>
-                          )}
-
-                          {table.name === "orders" && (
-                            <>
-                              <div className="grid grid-cols-6 items-center px-4 py-3 text-sm">
-                                <div className="font-medium">id</div>
-                                <div>integer</div>
-                                <div>-</div>
-                                <div>否</div>
-                                <div>自增</div>
-                                <div className="flex justify-end gap-2">
-                                  <Button variant="ghost" size="sm">
-                                    编辑
-                                  </Button>
-                                </div>
-                              </div>
-                              <div className="grid grid-cols-6 items-center px-4 py-3 text-sm">
-                                <div className="font-medium">user_id</div>
-                                <div>integer</div>
-                                <div>-</div>
-                                <div>否</div>
-                                <div>-</div>
-                                <div className="flex justify-end gap-2">
-                                  <Button variant="ghost" size="sm">
-                                    编辑
-                                  </Button>
-                                </div>
-                              </div>
-                              <div className="grid grid-cols-6 items-center px-4 py-3 text-sm">
-                                <div className="font-medium">status</div>
-                                <div>varchar</div>
-                                <div>20</div>
-                                <div>否</div>
-                                <div>'pending'</div>
-                                <div className="flex justify-end gap-2">
-                                  <Button variant="ghost" size="sm">
-                                    编辑
-                                  </Button>
-                                </div>
-                              </div>
-                              <div className="grid grid-cols-6 items-center px-4 py-3 text-sm">
-                                <div className="font-medium">total_amount</div>
-                                <div>decimal</div>
-                                <div>10,2</div>
-                                <div>否</div>
-                                <div>0.00</div>
-                                <div className="flex justify-end gap-2">
-                                  <Button variant="ghost" size="sm">
-                                    编辑
-                                  </Button>
-                                </div>
-                              </div>
-                              <div className="grid grid-cols-6 items-center px-4 py-3 text-sm">
-                                <div className="font-medium">created_at</div>
-                                <div>timestamp</div>
-                                <div>-</div>
-                                <div>否</div>
-                                <div>CURRENT_TIMESTAMP</div>
-                                <div className="flex justify-end gap-2">
-                                  <Button variant="ghost" size="sm">
-                                    编辑
-                                  </Button>
-                                </div>
-                              </div>
-                            </>
-                          )}
+                      ) : tableStructure.length === 0 ? (
+                        <div className="py-8 text-center">
+                          <Database className="mx-auto h-12 w-12 text-muted-foreground mb-2" />
+                          <p className="text-muted-foreground">暂无表结构数据</p>
                         </div>
-                      </div>
+                      ) : (
+                        <div className="rounded-md border">
+                          <div className="grid grid-cols-6 border-b bg-muted/50 px-4 py-3 text-sm font-medium">
+                            <div>字段名</div>
+                            <div>数据类型</div>
+                            <div>长度/精度</div>
+                            <div>允许空值</div>
+                            <div>默认值</div>
+                            <div className="text-right">操作</div>
+                          </div>
+                          <div className="divide-y">
+                            {tableStructure.map((field, index) => (
+                              <div key={index} className="grid grid-cols-6 items-center px-4 py-3 text-sm">
+                                <div className="font-medium">{field.name}</div>
+                                <div>{field.type}</div>
+                                <div>{field.length || "-"}</div>
+                                <div>{field.nullable ? "是" : "否"}</div>
+                                <div>{field.default || "-"}</div>
+                                <div className="flex justify-end gap-2">
+                                  <Button variant="ghost" size="sm">
+                                    编辑
+                                  </Button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
                 </>

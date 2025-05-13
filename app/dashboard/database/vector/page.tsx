@@ -1,7 +1,7 @@
 "use client"
 
-import { useState } from "react"
-import { VideoIcon as Vector, Search, Filter, MoreHorizontal, Layers, Save } from "lucide-react"
+import { useState, useEffect } from "react"
+import { VideoIcon as Vector, Search, Filter, MoreHorizontal, Layers, Save, AlertTriangle } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -19,51 +19,64 @@ import {
 import { Textarea } from "@/components/ui/textarea"
 import { Slider } from "@/components/ui/slider"
 import { Label } from "@/components/ui/label"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 
-const vectorCollections = [
-  { id: "product-embeddings", name: "产品向量", dimensions: 1536, vectors: 125000, indexType: "HNSW" },
-  { id: "document-embeddings", name: "文档向量", dimensions: 768, vectors: 85000, indexType: "HNSW" },
-  { id: "image-embeddings", name: "图像向量", dimensions: 512, vectors: 250000, indexType: "IVF" },
-  { id: "user-embeddings", name: "用户向量", dimensions: 384, vectors: 50000, indexType: "HNSW" },
-]
+// 导入 API
+import { vectorApi } from "@/api"
 
 export default function VectorDatabasePage() {
   const [activeTab, setActiveTab] = useState("collections")
   const [similarity, setSimilarity] = useState(0.75)
   const [searchQuery, setSearchQuery] = useState("一款高性能的笔记本电脑，适合开发和游戏")
   const [searchResults, setSearchResults] = useState<any>(null)
+  const [collections, setCollections] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [searchLoading, setSearchLoading] = useState(false)
 
-  const handleSearch = () => {
-    // 模拟搜索结果
-    setSearchResults({
-      results: [
-        {
-          id: "prod-1234",
-          name: "超能开发者笔记本 Pro",
-          score: 0.92,
-          description: "高性能开发者笔记本，搭载最新处理器和独立显卡，适合编程和游戏",
-        },
-        {
-          id: "prod-2345",
-          name: "游戏战神笔记本 X1",
-          score: 0.87,
-          description: "专业游戏笔记本，高刷新率屏幕，强劲散热系统，畅玩各类大型游戏",
-        },
-        {
-          id: "prod-3456",
-          name: "轻薄商务本 Air",
-          score: 0.76,
-          description: "轻薄商务笔记本，长续航，适合商务办公和轻度开发",
-        },
-        {
-          id: "prod-4567",
-          name: "全能创作者本 Creator",
-          score: 0.72,
-          description: "面向创意工作者的笔记本，色彩准确的屏幕，适合设计和开发",
-        },
-      ],
-      executionTime: "0.045 秒",
-    })
+  // 获取向量集合
+  useEffect(() => {
+    const fetchCollections = async () => {
+      try {
+        setLoading(true)
+        const response = await vectorApi.getVectorCollections()
+        if (response.success) {
+          setCollections(response.data)
+        } else {
+          setError(response.message)
+        }
+      } catch (err) {
+        setError('获取向量集合数据失败')
+        console.error(err)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchCollections()
+  }, [])
+
+  const handleSearch = async () => {
+    try {
+      setSearchLoading(true)
+      setError(null)
+      
+      // 使用 API 执行向量搜索
+      const response = await vectorApi.searchVectors("product-embeddings", searchQuery, {
+        similarity: similarity
+      })
+      
+      if (response.success) {
+        setSearchResults(response.data)
+      } else {
+        setError(response.message)
+      }
+    } catch (err) {
+      setError('执行向量搜索失败')
+      console.error(err)
+    } finally {
+      setSearchLoading(false)
+    }
   }
 
   return (
@@ -80,6 +93,14 @@ export default function VectorDatabasePage() {
           </Button>
         </div>
       </div>
+
+      {error && (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>错误</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList>
@@ -110,36 +131,48 @@ export default function VectorDatabasePage() {
               <div className="text-right">操作</div>
             </div>
             <div className="divide-y">
-              {vectorCollections.map((collection) => (
-                <div key={collection.id} className="grid grid-cols-6 items-center px-4 py-3 text-sm">
-                  <div className="font-medium">{collection.id}</div>
-                  <div>{collection.name}</div>
-                  <div>{collection.dimensions}</div>
-                  <div>{collection.vectors.toLocaleString()}</div>
-                  <div>
-                    <Badge variant="outline">{collection.indexType}</Badge>
-                  </div>
-                  <div className="flex justify-end">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon">
-                          <MoreHorizontal className="h-4 w-4" />
-                          <span className="sr-only">操作</span>
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuLabel>集合操作</DropdownMenuLabel>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem>查看详情</DropdownMenuItem>
-                        <DropdownMenuItem>添加向量</DropdownMenuItem>
-                        <DropdownMenuItem>重建索引</DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem className="text-red-600">删除集合</DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
+              {loading ? (
+                <div className="py-8 text-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+                  <p className="text-muted-foreground">加载中...</p>
                 </div>
-              ))}
+              ) : collections.length === 0 ? (
+                <div className="py-8 text-center">
+                  <Vector className="mx-auto h-12 w-12 text-muted-foreground mb-2" />
+                  <p className="text-muted-foreground">暂无向量集合数据</p>
+                </div>
+              ) : (
+                collections.map((collection) => (
+                  <div key={collection.id} className="grid grid-cols-6 items-center px-4 py-3 text-sm">
+                    <div className="font-medium">{collection.id}</div>
+                    <div>{collection.name}</div>
+                    <div>{collection.dimensions}</div>
+                    <div>{collection.vectors.toLocaleString()}</div>
+                    <div>
+                      <Badge variant="outline">{collection.indexType}</Badge>
+                    </div>
+                    <div className="flex justify-end">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon">
+                            <MoreHorizontal className="h-4 w-4" />
+                            <span className="sr-only">操作</span>
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuLabel>集合操作</DropdownMenuLabel>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem>查看详情</DropdownMenuItem>
+                          <DropdownMenuItem>添加向量</DropdownMenuItem>
+                          <DropdownMenuItem>重建索引</DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem className="text-red-600">删除集合</DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </TabsContent>
@@ -154,7 +187,7 @@ export default function VectorDatabasePage() {
               <div className="flex items-center gap-2">
                 <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
                   <option value="">选择向量集合</option>
-                  {vectorCollections.map((collection) => (
+                  {collections.map((collection) => (
                     <option key={collection.id} value={collection.id}>
                       {collection.name} ({collection.id})
                     </option>
@@ -262,9 +295,18 @@ export default function VectorDatabasePage() {
               </div>
 
               <div className="flex justify-end">
-                <Button onClick={handleSearch}>
-                  <Search className="mr-2 h-4 w-4" />
-                  搜索
+                <Button onClick={handleSearch} disabled={searchLoading}>
+                  {searchLoading ? (
+                    <>
+                      <Search className="mr-2 h-4 w-4 animate-spin" />
+                      搜索中...
+                    </>
+                  ) : (
+                    <>
+                      <Search className="mr-2 h-4 w-4" />
+                      搜索
+                    </>
+                  )}
                 </Button>
               </div>
 
@@ -272,15 +314,15 @@ export default function VectorDatabasePage() {
                 <div className="space-y-2 mt-4">
                   <div className="flex items-center justify-between text-sm">
                     <div>
-                      搜索结果: <span className="font-medium">{searchResults.results.length} 个</span>
+                      搜索结果: <span className="font-medium">{searchResults.length} 个</span>
                     </div>
                     <div>
-                      执行时间: <span className="font-medium">{searchResults.executionTime}</span>
+                      执行时间: <span className="font-medium">0.045 秒</span>
                     </div>
                   </div>
 
                   <div className="space-y-2">
-                    {searchResults.results.map((result: any) => (
+                    {searchResults.map((result: any) => (
                       <div key={result.id} className="rounded-md border p-3">
                         <div className="flex items-center justify-between">
                           <div className="font-medium">{result.name}</div>
