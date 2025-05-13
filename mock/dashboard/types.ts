@@ -46,10 +46,14 @@ export interface Shard {
 export interface Database {
   id: string
   name: string
-  charset: string
-  collation: string
+  charset?: string
+  collation?: string
   size: string
-  tables: number
+  tables?: number
+  retention?: string
+  series?: number
+  points?: string
+  status?: string
 }
 
 export interface Table {
@@ -60,6 +64,20 @@ export interface Table {
   rows: string
   size: string
   indexes: number
+}
+
+export interface TimeSeries {
+  name: string
+  tags: Array<{key: string, value: string}>
+  type: string
+  points: string
+}
+
+export interface RetentionPolicy {
+  name: string
+  duration: string
+  replication: number
+  default: boolean
 }
 
 export interface BackupHistory {

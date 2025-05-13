@@ -19,6 +19,10 @@ export const databases = [
     size: "2.1 TB",
     tables: 28,
   },
+  { id: "timeseries-01", name: "监控数据库", retention: "30天", series: 156, points: "1.2B", status: "正常" },
+  { id: "timeseries-02", name: "日志数据库", retention: "90天", series: 78, points: "3.5B", status: "警告" },
+  { id: "timeseries-03", name: "传感器数据库", retention: "365天", series: 245, points: "5.7B", status: "正常" },
+  { id: "timeseries-04", name: "指标数据库", retention: "180天", series: 124, points: "2.3B", status: "正常" },
 ]
 
 export const tables = [
@@ -68,6 +72,64 @@ export const tables = [
     indexes: 1,
   },
 ]
+
+export const timeseriesData = {
+  series: [
+    { name: "cpu_usage", tags: [{ key: "host", value: "server01" }, { key: "region", value: "cn-east" }], type: "float", points: "2.5M" },
+    { name: "memory_usage", tags: [{ key: "host", value: "server01" }, { key: "region", value: "cn-east" }], type: "float", points: "2.5M" },
+    { name: "disk_usage", tags: [{ key: "host", value: "server01" }, { key: "region", value: "cn-east" }], type: "float", points: "2.5M" },
+    { name: "network_in", tags: [{ key: "host", value: "server01" }, { key: "region", value: "cn-east" }], type: "float", points: "2.5M" },
+    { name: "network_out", tags: [{ key: "host", value: "server01" }, { key: "region", value: "cn-east" }], type: "float", points: "2.5M" },
+  ],
+  retentionPolicies: [
+    { name: "autogen", duration: "30d", replication: 1, default: true },
+    { name: "monthly", duration: "90d", replication: 1, default: false },
+    { name: "yearly", duration: "365d", replication: 1, default: false },
+  ],
+  stats: {
+    seriesCount: 156,
+    totalPoints: "1.2B",
+    diskSize: "45.8 GB",
+    writeRate: "10K points/s",
+    readRate: "25K points/s",
+    uptime: "45d 12h 30m",
+    lastBackup: "2023-05-09 01:00:00"
+  },
+  metrics: {
+    writePerformance: [
+      { time: "00:00", value: 8500 },
+      { time: "04:00", value: 5200 },
+      { time: "08:00", value: 12500 },
+      { time: "12:00", value: 15800 },
+      { time: "16:00", value: 14200 },
+      { time: "20:00", value: 9800 },
+    ],
+    readPerformance: [
+      { time: "00:00", value: 12000 },
+      { time: "04:00", value: 8000 },
+      { time: "08:00", value: 25000 },
+      { time: "12:00", value: 32000 },
+      { time: "16:00", value: 28000 },
+      { time: "20:00", value: 18000 },
+    ],
+    queryLatency: [
+      { time: "00:00", value: 15 },
+      { time: "04:00", value: 12 },
+      { time: "08:00", value: 25 },
+      { time: "12:00", value: 35 },
+      { time: "16:00", value: 30 },
+      { time: "20:00", value: 20 },
+    ],
+    memoryUsage: [
+      { time: "00:00", value: 45 },
+      { time: "04:00", value: 42 },
+      { time: "08:00", value: 65 },
+      { time: "12:00", value: 78 },
+      { time: "16:00", value: 72 },
+      { time: "20:00", value: 55 },
+    ],
+  }
+}
 
 export const performanceData = [
   { name: "00:00", cpu: 65, memory: 55, disk: 40, network: 70 },

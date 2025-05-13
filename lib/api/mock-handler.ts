@@ -41,3 +41,8 @@ export const useMock = () => {
 export const getMockData = (key: keyof typeof mockData) => {
   return mockData[key]
 }
+
+// 设置 mock 数据
+export const setMockData = (key: keyof typeof mockData, data: any) => {
+  (mockData as any)[key] = data
+}
