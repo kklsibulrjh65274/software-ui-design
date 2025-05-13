@@ -14,7 +14,9 @@ import {
   Trash2,
   FileText,
   Key,
-  ArrowLeft
+  ArrowLeft,
+  RefreshCw,
+  Eye
 } from "lucide-react"
 import Link from "next/link"
 
@@ -45,9 +47,11 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Table as TableComponent, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 
 // 导入 API
 import { databaseApi, dataModelApi } from "@/api"
+import { Table as TableType } from "@/mock/dashboard/types"
 
 export default function RelationalTablesPage() {
   const [searchTable, setSearchTable] = useState("")
@@ -55,19 +59,28 @@ export default function RelationalTablesPage() {
   const [selectedTable, setSelectedTable] = useState<string | null>(null)
   const [tableStructure, setTableStructure] = useState<any[]>([])
   const [tableIndexes, setTableIndexes] = useState<any[]>([])
+  const [tableData, setTableData] = useState<any>(null)
   const [tables, setTables] = useState<any[]>([])
   const [loading, setLoading] = useState({
     databases: true,
     tables: false,
     structure: false,
-    indexes: false
+    indexes: false,
+    data: false
   })
   const [error, setError] = useState<string | null>(null)
   const [databases, setDatabases] = useState<any[]>([])
   const [isCreateTableOpen, setIsCreateTableOpen] = useState(false)
   const [isCreateIndexOpen, setIsCreateIndexOpen] = useState(false)
   const [isAddFieldOpen, setIsAddFieldOpen] = useState(false)
+  const [isEditFieldOpen, setIsEditFieldOpen] = useState(false)
+  const [isConfirmDeleteTableOpen, setIsConfirmDeleteTableOpen] = useState(false)
+  const [isConfirmDeleteIndexOpen, setIsConfirmDeleteIndexOpen] = useState(false)
+  const [isViewDataOpen, setIsViewDataOpen] = useState(false)
   const [activeTab, setActiveTab] = useState("tables")
+  const [fieldToEdit, setFieldToEdit] = useState<any>(null)
+  const [indexToDelete, setIndexToDelete] = useState<string | null>(null)
+  const [tableToDelete, setTableToDelete] = useState<string | null>(null)
   const [newTableData, setNewTableData] = useState({
     name: "",
     fields: [
@@ -87,6 +100,13 @@ export default function RelationalTablesPage() {
     method: "BTREE"
   })
   const [newFieldData, setNewFieldData] = useState({
+    name: "",
+    type: "varchar",
+    length: "50",
+    nullable: false,
+    default: ""
+  })
+  const [editFieldData, setEditFieldData] = useState({
     name: "",
     type: "varchar",
     length: "50",
@@ -210,6 +230,7 @@ export default function RelationalTablesPage() {
 
     try {
       setLoading(prev => ({ ...prev, tables: true }))
+      setError(null)
       
       // 准备表数据，确保包含ID字段作为主键
       const tableData = {
@@ -271,6 +292,7 @@ export default function RelationalTablesPage() {
 
     try {
       setLoading(prev => ({ ...prev, indexes: true }))
+      setError(null)
       
       const indexData = {
         name: newIndexData.name,
@@ -319,6 +341,7 @@ export default function RelationalTablesPage() {
 
     try {
       setLoading(prev => ({ ...prev, structure: true }))
+      setError(null)
       
       // 准备修改表结构的数据
       const alterData = {
@@ -353,30 +376,74 @@ export default function RelationalTablesPage() {
     }
   }
 
-  // 删除表
-  const handleDropTable = async (tableName: string) => {
-    if (!selectedDatabase) {
-      setError('请先选择数据库')
+  // 编辑字段
+  const handleEditField = async () => {
+    if (!selectedDatabase || !selectedTable || !fieldToEdit) {
+      setError('请先选择数据库、表和字段')
       return
     }
 
-    if (!confirm(`确定要删除表 ${tableName} 吗？此操作不可恢复！`)) {
+    if (!editFieldData.name) {
+      setError('字段名不能为空')
+      return
+    }
+
+    try {
+      setLoading(prev => ({ ...prev, structure: true }))
+      setError(null)
+      
+      // 准备修改表结构的数据
+      const alterData = {
+        action: "MODIFY_COLUMN",
+        oldName: fieldToEdit.name,
+        column: editFieldData
+      }
+
+      const response = await dataModelApi.alterTable(selectedDatabase, selectedTable, alterData)
+      if (response.success) {
+        // 刷新表结构
+        const structureResponse = await dataModelApi.getTableStructure(selectedDatabase, selectedTable)
+        if (structureResponse.success) {
+          setTableStructure(structureResponse.data)
+        }
+        setIsEditFieldOpen(false)
+        setFieldToEdit(null)
+      } else {
+        setError(response.message)
+      }
+    } catch (err) {
+      setError('编辑字段失败')
+      console.error(err)
+    } finally {
+      setLoading(prev => ({ ...prev, structure: false }))
+    }
+  }
+
+  // 删除表
+  const handleDropTable = async () => {
+    if (!selectedDatabase || !tableToDelete) {
+      setError('请先选择数据库和表')
       return
     }
 
     try {
       setLoading(prev => ({ ...prev, tables: true }))
+      setError(null)
       
-      const response = await dataModelApi.dropTable(selectedDatabase, tableName)
+      const response = await dataModelApi.dropTable(selectedDatabase, tableToDelete)
       if (response.success) {
         // 刷新表列表
         const tablesResponse = await databaseApi.getTables({ database: selectedDatabase })
         if (tablesResponse.success) {
           setTables(tablesResponse.data.filter((table: any) => table.database === selectedDatabase))
         }
-        if (selectedTable === tableName) {
+        if (selectedTable === tableToDelete) {
           setSelectedTable(null)
+          setTableStructure([])
+          setTableIndexes([])
         }
+        setIsConfirmDeleteTableOpen(false)
+        setTableToDelete(null)
       } else {
         setError(response.message)
       }
@@ -389,26 +456,25 @@ export default function RelationalTablesPage() {
   }
 
   // 删除索引
-  const handleDropIndex = async (indexName: string) => {
-    if (!selectedDatabase || !selectedTable) {
-      setError('请先选择数据库和表')
-      return
-    }
-
-    if (!confirm(`确定要删除索引 ${indexName} 吗？`)) {
+  const handleDropIndex = async () => {
+    if (!selectedDatabase || !selectedTable || !indexToDelete) {
+      setError('请先选择数据库、表和索引')
       return
     }
 
     try {
       setLoading(prev => ({ ...prev, indexes: true }))
+      setError(null)
       
-      const response = await dataModelApi.dropIndex(selectedDatabase, selectedTable, indexName)
+      const response = await dataModelApi.dropIndex(selectedDatabase, selectedTable, indexToDelete)
       if (response.success) {
         // 刷新索引列表
         const indexesResponse = await dataModelApi.getTableIndexes(selectedDatabase, selectedTable)
         if (indexesResponse.success) {
           setTableIndexes(indexesResponse.data)
         }
+        setIsConfirmDeleteIndexOpen(false)
+        setIndexToDelete(null)
       } else {
         setError(response.message)
       }
@@ -417,6 +483,36 @@ export default function RelationalTablesPage() {
       console.error(err)
     } finally {
       setLoading(prev => ({ ...prev, indexes: false }))
+    }
+  }
+
+  // 查看表数据
+  const handleViewTableData = async () => {
+    if (!selectedDatabase || !selectedTable) {
+      setError('请先选择数据库和表')
+      return
+    }
+
+    try {
+      setLoading(prev => ({ ...prev, data: true }))
+      setError(null)
+      
+      const response = await databaseApi.executeQuery(
+        selectedDatabase, 
+        `SELECT * FROM ${selectedTable} LIMIT 100`
+      )
+      
+      if (response.success) {
+        setTableData(response.data)
+        setIsViewDataOpen(true)
+      } else {
+        setError(response.message)
+      }
+    } catch (err) {
+      setError('获取表数据失败')
+      console.error(err)
+    } finally {
+      setLoading(prev => ({ ...prev, data: false }))
     }
   }
 
@@ -453,6 +549,14 @@ export default function RelationalTablesPage() {
     setNewTableData({ ...newTableData, fields: updatedFields })
   }
 
+  // 更新索引字段
+  const updateIndexColumn = (value: string) => {
+    setNewIndexData({
+      ...newIndexData,
+      columns: [value]
+    })
+  }
+
   // 过滤表
   const filteredTables = tables.filter(table => 
     table.name.toLowerCase().includes(searchTable.toLowerCase())
@@ -480,7 +584,7 @@ export default function RelationalTablesPage() {
         <div className="flex gap-2">
           <Dialog open={isCreateTableOpen} onOpenChange={setIsCreateTableOpen}>
             <DialogTrigger asChild>
-              <Button>
+              <Button disabled={!selectedDatabase}>
                 <Table className="mr-2 h-4 w-4" />
                 创建表
               </Button>
@@ -641,9 +745,13 @@ export default function RelationalTablesPage() {
               onChange={(e) => setSearchTable(e.target.value)}
             />
           </div>
-          <Button variant="outline" size="icon">
+          <Button 
+            variant="outline" 
+            size="icon"
+            onClick={() => setSearchTable("")}
+          >
             <Filter className="h-4 w-4" />
-            <span className="sr-only">筛选</span>
+            <span className="sr-only">重置筛选</span>
           </Button>
         </div>
         <div className="flex items-center gap-2">
@@ -666,6 +774,32 @@ export default function RelationalTablesPage() {
               )}
             </SelectContent>
           </Select>
+          <Button 
+            variant="outline" 
+            size="icon"
+            onClick={async () => {
+              if (!selectedDatabase) return
+              
+              try {
+                setLoading(prev => ({ ...prev, tables: true }))
+                setError(null)
+                const response = await databaseApi.getTables({ database: selectedDatabase })
+                if (response.success) {
+                  setTables(response.data.filter((table: any) => table.database === selectedDatabase))
+                } else {
+                  setError(response.message)
+                }
+              } catch (err) {
+                setError('刷新表列表失败')
+                console.error(err)
+              } finally {
+                setLoading(prev => ({ ...prev, tables: false }))
+              }
+            }}
+          >
+            <RefreshCw className="h-4 w-4" />
+            <span className="sr-only">刷新</span>
+          </Button>
         </div>
       </div>
 
@@ -759,13 +893,26 @@ export default function RelationalTablesPage() {
                               </DropdownMenuItem>
                               <DropdownMenuItem onClick={() => {
                                 setSelectedTable(table.name)
+                                handleViewTableData()
+                              }}>
+                                <Eye className="mr-2 h-4 w-4" />
+                                查看数据
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => {
+                                setSelectedTable(table.name)
                                 setActiveTab("indexes")
                               }}>
                                 <Key className="mr-2 h-4 w-4" />
                                 管理索引
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
-                              <DropdownMenuItem className="text-red-600" onClick={() => handleDropTable(table.name)}>
+                              <DropdownMenuItem 
+                                className="text-red-600" 
+                                onClick={() => {
+                                  setTableToDelete(table.name)
+                                  setIsConfirmDeleteTableOpen(true)
+                                }}
+                              >
                                 <Trash2 className="mr-2 h-4 w-4" />
                                 删除表
                               </DropdownMenuItem>
@@ -937,7 +1084,22 @@ export default function RelationalTablesPage() {
                         <div>{field.nullable ? "是" : "否"}</div>
                         <div>{field.default || "-"}</div>
                         <div className="flex justify-end gap-2">
-                          <Button variant="ghost" size="sm">
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => {
+                              setFieldToEdit(field)
+                              setEditFieldData({
+                                name: field.name,
+                                type: field.type,
+                                length: field.length || "50",
+                                nullable: field.nullable,
+                                default: field.default || ""
+                              })
+                              setIsEditFieldOpen(true)
+                            }}
+                            disabled={field.name === "id"} // 禁止编辑主键
+                          >
                             <Edit className="h-4 w-4" />
                             <span className="sr-only">编辑</span>
                           </Button>
@@ -998,7 +1160,7 @@ export default function RelationalTablesPage() {
                           </Label>
                           <Select 
                             value={newIndexData.columns[0]} 
-                            onValueChange={(value) => setNewIndexData({...newIndexData, columns: [value]})}
+                            onValueChange={updateIndexColumn}
                           >
                             <SelectTrigger className="col-span-3">
                               <SelectValue placeholder="选择字段" />
@@ -1107,7 +1269,7 @@ export default function RelationalTablesPage() {
                         <div className="font-medium">{index.name}</div>
                         <div>{index.columns.join(", ")}</div>
                         <div>
-                          <Badge variant={index.type === "UNIQUE" ? "secondary" : "outline"}>
+                          <Badge variant={index.type === "UNIQUE" ? "secondary" : index.type === "PRIMARY" ? "default" : "outline"}>
                             {index.type}
                           </Badge>
                         </div>
@@ -1117,7 +1279,11 @@ export default function RelationalTablesPage() {
                             variant="ghost" 
                             size="sm" 
                             className="text-red-600"
-                            onClick={() => handleDropIndex(index.name)}
+                            onClick={() => {
+                              setIndexToDelete(index.name)
+                              setIsConfirmDeleteIndexOpen(true)
+                            }}
+                            disabled={index.type === "PRIMARY"} // 禁止删除主键索引
                           >
                             <Trash2 className="h-4 w-4" />
                             <span className="sr-only">删除</span>
@@ -1132,6 +1298,257 @@ export default function RelationalTablesPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* 编辑字段对话框 */}
+      <Dialog open={isEditFieldOpen} onOpenChange={setIsEditFieldOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>编辑字段</DialogTitle>
+            <DialogDescription>
+              修改表 {selectedTable} 中的字段 {fieldToEdit?.name}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="edit-field-name" className="text-right">
+                字段名
+              </Label>
+              <Input
+                id="edit-field-name"
+                value={editFieldData.name}
+                onChange={(e) => setEditFieldData({...editFieldData, name: e.target.value})}
+                placeholder="输入字段名"
+                className="col-span-3"
+                required
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="edit-field-type" className="text-right">
+                数据类型
+              </Label>
+              <Select 
+                value={editFieldData.type}
+                onValueChange={(value) => setEditFieldData({...editFieldData, type: value})}
+              >
+                <SelectTrigger id="edit-field-type" className="col-span-3">
+                  <SelectValue placeholder="选择数据类型" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="varchar">VARCHAR</SelectItem>
+                  <SelectItem value="integer">INTEGER</SelectItem>
+                  <SelectItem value="text">TEXT</SelectItem>
+                  <SelectItem value="decimal">DECIMAL</SelectItem>
+                  <SelectItem value="timestamp">TIMESTAMP</SelectItem>
+                  <SelectItem value="boolean">BOOLEAN</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="edit-field-length" className="text-right">
+                长度/精度
+              </Label>
+              <Input
+                id="edit-field-length"
+                value={editFieldData.length}
+                onChange={(e) => setEditFieldData({...editFieldData, length: e.target.value})}
+                placeholder="例如：50 或 10,2"
+                className="col-span-3"
+                disabled={editFieldData.type === 'text' || editFieldData.type === 'boolean'}
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="edit-field-default" className="text-right">
+                默认值
+              </Label>
+              <Input
+                id="edit-field-default"
+                value={editFieldData.default}
+                onChange={(e) => setEditFieldData({...editFieldData, default: e.target.value})}
+                placeholder="默认值（可选）"
+                className="col-span-3"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <div className="text-right">
+                <Label htmlFor="edit-field-nullable">允许空值</Label>
+              </div>
+              <div className="col-span-3 flex items-center space-x-2">
+                <Checkbox 
+                  id="edit-field-nullable" 
+                  checked={editFieldData.nullable}
+                  onCheckedChange={(checked) => 
+                    setEditFieldData({...editFieldData, nullable: checked === true})
+                  }
+                />
+                <Label htmlFor="edit-field-nullable">允许 NULL 值</Label>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setIsEditFieldOpen(false)}>
+              取消
+            </Button>
+            <Button type="button" onClick={handleEditField} disabled={!editFieldData.name}>
+              保存修改
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 查看表数据对话框 */}
+      <Dialog open={isViewDataOpen} onOpenChange={setIsViewDataOpen}>
+        <DialogContent className="max-w-5xl max-h-[80vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle>表数据</DialogTitle>
+            <DialogDescription>
+              {selectedTable ? `${selectedDatabase} / ${selectedTable} 的数据` : ""}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 overflow-auto py-4">
+            {loading.data ? (
+              <div className="flex justify-center items-center h-64">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+              </div>
+            ) : !tableData ? (
+              <div className="flex items-center justify-center h-64">
+                <div className="text-center">
+                  <Database className="mx-auto h-12 w-12 text-muted-foreground" />
+                  <h3 className="mt-2 text-lg font-medium">无法获取数据</h3>
+                  <p className="mt-1 text-sm text-muted-foreground">无法获取表数据或表为空</p>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center justify-between mb-4 text-sm">
+                  <div>
+                    显示 <span className="font-medium">{tableData.rows.length}</span> 行数据 (最多显示100行)
+                  </div>
+                  <div>
+                    执行时间: <span className="font-medium">{tableData.executionTime}</span>
+                  </div>
+                </div>
+                <div className="rounded-md border overflow-auto max-h-[50vh]">
+                  <TableComponent>
+                    <TableHeader>
+                      <TableRow>
+                        {tableData.columns.map((column: string) => (
+                          <TableHead key={column}>{column}</TableHead>
+                        ))}
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {tableData.rows.map((row: any, index: number) => (
+                        <TableRow key={index}>
+                          {tableData.columns.map((column: string) => (
+                            <TableCell key={column}>
+                              {row[column] !== null ? String(row[column]) : <span className="text-muted-foreground italic">NULL</span>}
+                            </TableCell>
+                          ))}
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </TableComponent>
+                </div>
+              </>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsViewDataOpen(false)}>
+              关闭
+            </Button>
+            {tableData && (
+              <Button onClick={() => {
+                try {
+                  // 将表数据转换为 CSV 格式
+                  const headers = tableData.columns.join(',')
+                  const rows = tableData.rows.map((row: any) => 
+                    tableData.columns.map((col: string) => 
+                      row[col] !== null ? `"${row[col]}"` : '""'
+                    ).join(',')
+                  ).join('\n')
+                  const csvContent = `${headers}\n${rows}`
+                  
+                  // 创建 Blob 对象
+                  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+                  
+                  // 创建下载链接并触发下载
+                  const url = URL.createObjectURL(blob)
+                  const link = document.createElement('a')
+                  link.href = url
+                  link.setAttribute('download', `${selectedTable}-data.csv`)
+                  document.body.appendChild(link)
+                  link.click()
+                  document.body.removeChild(link)
+                } catch (err) {
+                  console.error("导出表数据出错:", err)
+                  setError("导出表数据失败")
+                }
+              }}>
+                <Download className="mr-2 h-4 w-4" />
+                导出数据
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 确认删除表对话框 */}
+      <Dialog open={isConfirmDeleteTableOpen} onOpenChange={setIsConfirmDeleteTableOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>确认删除表</DialogTitle>
+            <DialogDescription>
+              您确定要删除表 {tableToDelete} 吗？此操作不可撤销，将永久删除该表及其所有数据。
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Alert variant="destructive">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertTitle>危险操作</AlertTitle>
+              <AlertDescription>
+                删除表将永久移除所有相关的数据、索引和约束。此操作无法恢复。
+              </AlertDescription>
+            </Alert>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsConfirmDeleteTableOpen(false)}>
+              取消
+            </Button>
+            <Button variant="destructive" onClick={handleDropTable}>
+              确认删除
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 确认删除索引对话框 */}
+      <Dialog open={isConfirmDeleteIndexOpen} onOpenChange={setIsConfirmDeleteIndexOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>确认删除索引</DialogTitle>
+            <DialogDescription>
+              您确定要删除索引 {indexToDelete} 吗？
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Alert>
+              <AlertTriangle className="h-4 w-4" />
+              <AlertTitle>注意</AlertTitle>
+              <AlertDescription>
+                删除索引可能会影响查询性能，但不会影响表中的数据。
+              </AlertDescription>
+            </Alert>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsConfirmDeleteIndexOpen(false)}>
+              取消
+            </Button>
+            <Button variant="destructive" onClick={handleDropIndex}>
+              确认删除
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

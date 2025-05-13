@@ -11,7 +11,10 @@ import {
   Download,
   AlertTriangle,
   FileText,
-  Plus
+  Plus,
+  Trash2,
+  RefreshCw,
+  Save
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -41,6 +44,7 @@ import {
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Table as TableComponent, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 
 // 导入 API
 import { databaseApi } from "@/api"
@@ -55,6 +59,10 @@ export default function RelationalDatabasePage() {
   const [databases, setDatabases] = useState<any[]>([])
   const [loadingDatabases, setLoadingDatabases] = useState(true)
   const [isCreateDatabaseOpen, setIsCreateDatabaseOpen] = useState(false)
+  const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false)
+  const [databaseToDelete, setDatabaseToDelete] = useState<string | null>(null)
+  const [searchQuery, setSearchQuery] = useState("")
+  const [isExecutingQuery, setIsExecutingQuery] = useState(false)
   const [newDatabaseData, setNewDatabaseData] = useState({
     name: "",
     charset: "UTF-8",
@@ -69,6 +77,9 @@ export default function RelationalDatabasePage() {
         const response = await databaseApi.relationalApi.getRelationalDatabases()
         if (response.success) {
           setDatabases(response.data)
+          if (response.data.length > 0) {
+            setSelectedDatabase(response.data[0].id)
+          }
         } else {
           setError(response.message || "获取数据库列表失败")
         }
@@ -84,8 +95,18 @@ export default function RelationalDatabasePage() {
   }, [])
 
   const handleExecuteQuery = async () => {
+    if (!selectedDatabase) {
+      setError("请先选择数据库")
+      return
+    }
+    
+    if (!sqlQuery.trim()) {
+      setError("查询语句不能为空")
+      return
+    }
+
     try {
-      setIsLoading(true)
+      setIsExecutingQuery(true)
       setError(null)
       
       // 使用 API 执行查询
@@ -100,7 +121,7 @@ export default function RelationalDatabasePage() {
       console.error("执行查询出错:", err)
       setError("执行查询时发生错误")
     } finally {
-      setIsLoading(false)
+      setIsExecutingQuery(false)
     }
   }
 
@@ -136,6 +157,11 @@ export default function RelationalDatabasePage() {
   }
 
   const handleCreateDatabase = async () => {
+    if (!newDatabaseData.name) {
+      setError("数据库名称不能为空")
+      return
+    }
+    
     try {
       setIsLoading(true)
       setError(null)
@@ -169,8 +195,8 @@ export default function RelationalDatabasePage() {
     }
   }
 
-  const handleDeleteDatabase = async (id: string) => {
-    if (!confirm(`确定要删除数据库 ${id} 吗？此操作不可恢复！`)) {
+  const handleDeleteDatabase = async () => {
+    if (!databaseToDelete) {
       return
     }
     
@@ -179,14 +205,16 @@ export default function RelationalDatabasePage() {
       setError(null)
       
       // 使用 API 删除数据库
-      const response = await databaseApi.deleteDatabase(id)
+      const response = await databaseApi.deleteDatabase(databaseToDelete)
       
       if (response.success) {
         // 从列表中移除已删除的数据库
-        setDatabases(databases.filter(db => db.id !== id))
-        if (selectedDatabase === id) {
+        setDatabases(databases.filter(db => db.id !== databaseToDelete))
+        if (selectedDatabase === databaseToDelete) {
           setSelectedDatabase(databases[0]?.id || "")
         }
+        setIsConfirmDeleteOpen(false)
+        setDatabaseToDelete(null)
       } else {
         setError(response.message || "删除数据库失败")
       }
@@ -197,6 +225,12 @@ export default function RelationalDatabasePage() {
       setIsLoading(false)
     }
   }
+
+  // 过滤数据库
+  const filteredDatabases = databases.filter(db => 
+    db.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    db.id.toLowerCase().includes(searchQuery.toLowerCase())
+  )
 
   return (
     <div className="space-y-6">
@@ -318,11 +352,45 @@ export default function RelationalDatabasePage() {
           <div className="flex items-center gap-2">
             <div className="relative flex-1">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input type="search" placeholder="搜索数据库..." className="pl-8" />
+              <Input 
+                type="search" 
+                placeholder="搜索数据库..." 
+                className="pl-8" 
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
             </div>
-            <Button variant="outline" size="icon">
+            <Button 
+              variant="outline" 
+              size="icon"
+              onClick={() => setSearchQuery("")}
+            >
               <Filter className="h-4 w-4" />
-              <span className="sr-only">筛选</span>
+              <span className="sr-only">重置筛选</span>
+            </Button>
+            <Button 
+              variant="outline" 
+              size="icon"
+              onClick={async () => {
+                try {
+                  setLoadingDatabases(true)
+                  setError(null)
+                  const response = await databaseApi.relationalApi.getRelationalDatabases()
+                  if (response.success) {
+                    setDatabases(response.data)
+                  } else {
+                    setError(response.message || "刷新数据库列表失败")
+                  }
+                } catch (err) {
+                  console.error("刷新数据库列表出错:", err)
+                  setError("刷新数据库列表时发生错误")
+                } finally {
+                  setLoadingDatabases(false)
+                }
+              }}
+            >
+              <RefreshCw className="h-4 w-4" />
+              <span className="sr-only">刷新</span>
             </Button>
           </div>
 
@@ -341,22 +409,26 @@ export default function RelationalDatabasePage() {
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
                   <p className="text-muted-foreground">加载中...</p>
                 </div>
-              ) : databases.length === 0 ? (
+              ) : filteredDatabases.length === 0 ? (
                 <div className="py-8 text-center">
                   <Database className="mx-auto h-12 w-12 text-muted-foreground mb-2" />
-                  <p className="text-muted-foreground">暂无数据库</p>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    className="mt-4"
-                    onClick={() => setIsCreateDatabaseOpen(true)}
-                  >
-                    <Plus className="mr-2 h-4 w-4" />
-                    创建第一个数据库
-                  </Button>
+                  <p className="text-muted-foreground">
+                    {databases.length === 0 ? "暂无数据库" : "没有匹配的数据库"}
+                  </p>
+                  {databases.length === 0 && (
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="mt-4"
+                      onClick={() => setIsCreateDatabaseOpen(true)}
+                    >
+                      <Plus className="mr-2 h-4 w-4" />
+                      创建第一个数据库
+                    </Button>
+                  )}
                 </div>
               ) : (
-                databases.map((db) => (
+                filteredDatabases.map((db) => (
                   <div key={db.id} className="grid grid-cols-6 items-center px-4 py-3 text-sm">
                     <div className="font-medium">{db.id}</div>
                     <div>{db.name}</div>
@@ -389,6 +461,7 @@ export default function RelationalDatabasePage() {
                           <DropdownMenuItem onClick={() => {
                             setSelectedDatabase(db.id)
                             setActiveTab("query")
+                            setSqlQuery(`SELECT * FROM information_schema.tables WHERE table_schema = 'public' LIMIT 10;`)
                           }}>
                             <Play className="mr-2 h-4 w-4" />
                             执行查询
@@ -400,8 +473,12 @@ export default function RelationalDatabasePage() {
                           <DropdownMenuSeparator />
                           <DropdownMenuItem 
                             className="text-red-600"
-                            onClick={() => handleDeleteDatabase(db.id)}
+                            onClick={() => {
+                              setDatabaseToDelete(db.id)
+                              setIsConfirmDeleteOpen(true)
+                            }}
                           >
+                            <Trash2 className="mr-2 h-4 w-4" />
                             删除
                           </DropdownMenuItem>
                         </DropdownMenuContent>
@@ -510,6 +587,47 @@ export default function RelationalDatabasePage() {
                    <Download className="h-4 w-4" />
                    <span className="sr-only">下载</span>
                 </Button>
+                
+                <Button 
+                  variant="outline" 
+                  size="icon"
+                  onClick={() => {
+                    // 清空查询结果
+                    setQueryResult(null)
+                    // 重置查询语句
+                    setSqlQuery("SELECT * FROM users LIMIT 10;")
+                  }}
+                  title="清空"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  <span className="sr-only">清空</span>
+                </Button>
+                
+                <Button 
+                  variant="outline" 
+                  size="icon"
+                  onClick={() => {
+                    // 保存查询语句到本地存储
+                    try {
+                      const savedQueries = JSON.parse(localStorage.getItem('savedQueries') || '[]')
+                      if (!savedQueries.includes(sqlQuery)) {
+                        savedQueries.unshift(sqlQuery)
+                        // 只保留最近10条查询
+                        if (savedQueries.length > 10) {
+                          savedQueries.pop()
+                        }
+                        localStorage.setItem('savedQueries', JSON.stringify(savedQueries))
+                      }
+                      alert('查询已保存')
+                    } catch (err) {
+                      console.error('保存查询失败:', err)
+                    }
+                  }}
+                  title="保存查询"
+                >
+                  <Save className="h-4 w-4" />
+                  <span className="sr-only">保存查询</span>
+                </Button>
               </div>
 
               <Textarea
@@ -520,8 +638,8 @@ export default function RelationalDatabasePage() {
               />
 
               <div className="flex justify-end">
-                <Button onClick={handleExecuteQuery} disabled={isLoading}>
-                  {isLoading ? (
+                <Button onClick={handleExecuteQuery} disabled={isExecutingQuery || !selectedDatabase}>
+                  {isExecutingQuery ? (
                     <>
                       <Play className="mr-2 h-4 w-4 animate-pulse" />
                       执行中...
@@ -539,7 +657,7 @@ export default function RelationalDatabasePage() {
                 <div className="space-y-2">
                   <div className="flex items-center justify-between text-sm">
                     <div>
-                      查询结果: <span className="font-medium">{queryResult.rowCount} 行</span>
+                      查询结果: <span className="font-medium">{queryResult.rowCount || queryResult.rows?.length || 0} 行</span>
                     </div>
                     <div>
                       执行时间: <span className="font-medium">{queryResult.executionTime}</span>
@@ -547,28 +665,24 @@ export default function RelationalDatabasePage() {
                   </div>
 
                   <div className="rounded-md border overflow-auto">
-                    <table className="min-w-full divide-y divide-border">
-                      <thead>
-                        <tr className="bg-muted/50">
+                    <TableComponent>
+                      <TableHeader>
+                        <TableRow>
                           {queryResult.columns.map((column: string) => (
-                            <th key={column} className="px-4 py-3 text-left text-sm font-medium">
-                              {column}
-                            </th>
+                            <TableHead key={column}>{column}</TableHead>
                           ))}
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-border">
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
                         {queryResult.rows.map((row: any, index: number) => (
-                          <tr key={index}>
+                          <TableRow key={index}>
                             {queryResult.columns.map((column: string) => (
-                              <td key={column} className="px-4 py-3 text-sm">
-                                {row[column]}
-                              </td>
+                              <TableCell key={column}>{row[column]}</TableCell>
                             ))}
-                          </tr>
+                          </TableRow>
                         ))}
-                      </tbody>
-                    </table>
+                      </TableBody>
+                    </TableComponent>
                   </div>
                   
                   <div className="flex justify-end">
@@ -583,6 +697,45 @@ export default function RelationalDatabasePage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* 确认删除对话框 */}
+      <Dialog open={isConfirmDeleteOpen} onOpenChange={setIsConfirmDeleteOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>确认删除数据库</DialogTitle>
+            <DialogDescription>
+              您确定要删除数据库 "{databases.find(db => db.id === databaseToDelete)?.name || databaseToDelete}" 吗？此操作不可撤销，将永久删除该数据库及其所有数据。
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Alert variant="destructive">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertTitle>危险操作</AlertTitle>
+              <AlertDescription>
+                删除数据库将永久移除所有相关的表、索引、视图和存储过程。此操作无法恢复。
+              </AlertDescription>
+            </Alert>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsConfirmDeleteOpen(false)}>
+              取消
+            </Button>
+            <Button variant="destructive" onClick={handleDeleteDatabase} disabled={isLoading}>
+              {isLoading ? (
+                <>
+                  <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                  删除中...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  确认删除
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
