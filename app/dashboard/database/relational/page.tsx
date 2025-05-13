@@ -10,7 +10,8 @@ import {
   Play,
   Download,
   AlertTriangle,
-  FileText
+  FileText,
+  Plus
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -29,6 +30,17 @@ import {
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import { Label } from "@/components/ui/label"
+import { Checkbox } from "@/components/ui/checkbox"
 
 // 导入 API
 import { databaseApi } from "@/api"
@@ -42,6 +54,12 @@ export default function RelationalDatabasePage() {
   const [isLoading, setIsLoading] = useState(false)
   const [databases, setDatabases] = useState<any[]>([])
   const [loadingDatabases, setLoadingDatabases] = useState(true)
+  const [isCreateDatabaseOpen, setIsCreateDatabaseOpen] = useState(false)
+  const [newDatabaseData, setNewDatabaseData] = useState({
+    name: "",
+    charset: "UTF-8",
+    collation: "en_US.UTF-8"
+  })
 
   // 获取数据库列表
   useEffect(() => {
@@ -117,6 +135,69 @@ export default function RelationalDatabasePage() {
     }
   }
 
+  const handleCreateDatabase = async () => {
+    try {
+      setIsLoading(true)
+      setError(null)
+      
+      // 使用 API 创建数据库
+      const response = await databaseApi.createDatabase({
+        name: newDatabaseData.name,
+        charset: newDatabaseData.charset,
+        collation: newDatabaseData.collation,
+        type: "relational"
+      })
+      
+      if (response.success) {
+        // 添加新创建的数据库到列表
+        setDatabases([...databases, response.data])
+        setIsCreateDatabaseOpen(false)
+        // 重置表单
+        setNewDatabaseData({
+          name: "",
+          charset: "UTF-8",
+          collation: "en_US.UTF-8"
+        })
+      } else {
+        setError(response.message || "创建数据库失败")
+      }
+    } catch (err) {
+      console.error("创建数据库出错:", err)
+      setError("创建数据库时发生错误")
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleDeleteDatabase = async (id: string) => {
+    if (!confirm(`确定要删除数据库 ${id} 吗？此操作不可恢复！`)) {
+      return
+    }
+    
+    try {
+      setIsLoading(true)
+      setError(null)
+      
+      // 使用 API 删除数据库
+      const response = await databaseApi.deleteDatabase(id)
+      
+      if (response.success) {
+        // 从列表中移除已删除的数据库
+        setDatabases(databases.filter(db => db.id !== id))
+        if (selectedDatabase === id) {
+          setSelectedDatabase(databases[0]?.id || "")
+        }
+      } else {
+        setError(response.message || "删除数据库失败")
+      }
+    } catch (err) {
+      console.error("删除数据库出错:", err)
+      setError("删除数据库时发生错误")
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -125,10 +206,96 @@ export default function RelationalDatabasePage() {
           <p className="text-muted-foreground">管理和查询关系型数据库</p>
         </div>
         <div className="flex gap-2">
-          <Button>
-            <Database className="mr-2 h-4 w-4" />
-            创建数据库
-          </Button>
+          <Dialog open={isCreateDatabaseOpen} onOpenChange={setIsCreateDatabaseOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Database className="mr-2 h-4 w-4" />
+                创建数据库
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>创建新数据库</DialogTitle>
+                <DialogDescription>
+                  创建一个新的关系型数据库实例。请填写以下信息。
+                </DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="db-name" className="text-right">
+                    数据库名称
+                  </Label>
+                  <Input
+                    id="db-name"
+                    value={newDatabaseData.name}
+                    onChange={(e) => setNewDatabaseData({...newDatabaseData, name: e.target.value})}
+                    placeholder="输入数据库名称"
+                    className="col-span-3"
+                    required
+                  />
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="db-charset" className="text-right">
+                    字符集
+                  </Label>
+                  <Select 
+                    value={newDatabaseData.charset}
+                    onValueChange={(value) => setNewDatabaseData({...newDatabaseData, charset: value})}
+                  >
+                    <SelectTrigger id="db-charset" className="col-span-3">
+                      <SelectValue placeholder="选择字符集" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="UTF-8">UTF-8</SelectItem>
+                      <SelectItem value="UTF-16">UTF-16</SelectItem>
+                      <SelectItem value="ASCII">ASCII</SelectItem>
+                      <SelectItem value="GBK">GBK</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="db-collation" className="text-right">
+                    排序规则
+                  </Label>
+                  <Select 
+                    value={newDatabaseData.collation}
+                    onValueChange={(value) => setNewDatabaseData({...newDatabaseData, collation: value})}
+                  >
+                    <SelectTrigger id="db-collation" className="col-span-3">
+                      <SelectValue placeholder="选择排序规则" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="en_US.UTF-8">en_US.UTF-8</SelectItem>
+                      <SelectItem value="zh_CN.UTF-8">zh_CN.UTF-8</SelectItem>
+                      <SelectItem value="C">C (Binary)</SelectItem>
+                      <SelectItem value="POSIX">POSIX</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <div className="col-span-4">
+                    <div className="flex items-center space-x-2">
+                      <Checkbox id="db-template" />
+                      <label
+                        htmlFor="db-template"
+                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                      >
+                        使用模板数据库
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsCreateDatabaseOpen(false)}>
+                  取消
+                </Button>
+                <Button onClick={handleCreateDatabase} disabled={isLoading || !newDatabaseData.name}>
+                  {isLoading ? "创建中..." : "创建数据库"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 
@@ -170,9 +337,24 @@ export default function RelationalDatabasePage() {
             </div>
             <div className="divide-y">
               {loadingDatabases ? (
-                <div className="py-8 text-center">加载中...</div>
+                <div className="py-8 text-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+                  <p className="text-muted-foreground">加载中...</p>
+                </div>
               ) : databases.length === 0 ? (
-                <div className="py-8 text-center">暂无数据库</div>
+                <div className="py-8 text-center">
+                  <Database className="mx-auto h-12 w-12 text-muted-foreground mb-2" />
+                  <p className="text-muted-foreground">暂无数据库</p>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="mt-4"
+                    onClick={() => setIsCreateDatabaseOpen(true)}
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    创建第一个数据库
+                  </Button>
+                </div>
               ) : (
                 databases.map((db) => (
                   <div key={db.id} className="grid grid-cols-6 items-center px-4 py-3 text-sm">
@@ -204,12 +386,24 @@ export default function RelationalDatabasePage() {
                             <Table className="mr-2 h-4 w-4" />
                             查看表
                           </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => {
+                            setSelectedDatabase(db.id)
+                            setActiveTab("query")
+                          }}>
+                            <Play className="mr-2 h-4 w-4" />
+                            执行查询
+                          </DropdownMenuItem>
                           <DropdownMenuItem>
                             <FileText className="mr-2 h-4 w-4" />
                             备份
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
-                          <DropdownMenuItem className="text-red-600">删除</DropdownMenuItem>
+                          <DropdownMenuItem 
+                            className="text-red-600"
+                            onClick={() => handleDeleteDatabase(db.id)}
+                          >
+                            删除
+                          </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </div>

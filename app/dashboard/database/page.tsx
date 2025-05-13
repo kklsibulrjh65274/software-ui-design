@@ -17,7 +17,6 @@ import { Database, Table, Clock, VideoIcon as Vector, Map } from "lucide-react"
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
@@ -52,12 +51,6 @@ export default function DatabaseOverviewPage() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">数据库管理</h1>
           <p className="text-muted-foreground">管理和监控所有数据库实例</p>
-        </div>
-        <div className="flex gap-2">
-          <Button>
-            <Database className="mr-2 h-4 w-4" />
-            创建数据库
-          </Button>
         </div>
       </div>
 
@@ -108,7 +101,7 @@ export default function DatabaseOverviewPage() {
         </Card>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-7">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
         <Card className="md:col-span-3">
           <CardHeader>
             <CardTitle>数据库类型分布</CardTitle>
