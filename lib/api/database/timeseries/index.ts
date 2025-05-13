@@ -52,55 +52,10 @@ export const createTimeseriesDatabase = async (data: any): Promise<ApiResponse<a
       points: "0",
       status: "正常"
     }
-    
-    // 添加到数据库列表
-    const databases = [
-      { id: "timeseries-01", name: "监控数据库", retention: "30天", series: 156, points: "1.2B", status: "正常" },
-      { id: "timeseries-02", name: "日志数据库", retention: "90天", series: 78, points: "3.5B", status: "警告" },
-      { id: "timeseries-03", name: "传感器数据库", retention: "365天", series: 245, points: "5.7B", status: "正常" },
-      { id: "timeseries-04", name: "指标数据库", retention: "180天", series: 124, points: "2.3B", status: "正常" },
-    ]
-    
-    databases.push(newDatabase)
-    
     return mockResponse(newDatabase)
   }
   
   return api.post('/database/timeseries', data)
-}
-
-// 更新时序数据库
-export const updateTimeseriesDatabase = async (id: string, data: any): Promise<ApiResponse<any>> => {
-  if (useMock()) {
-    const databases = [
-      { id: "timeseries-01", name: "监控数据库", retention: "30天", series: 156, points: "1.2B", status: "正常" },
-      { id: "timeseries-02", name: "日志数据库", retention: "90天", series: 78, points: "3.5B", status: "警告" },
-      { id: "timeseries-03", name: "传感器数据库", retention: "365天", series: 245, points: "5.7B", status: "正常" },
-      { id: "timeseries-04", name: "指标数据库", retention: "180天", series: 124, points: "2.3B", status: "正常" },
-    ]
-    
-    const databaseIndex = databases.findIndex(db => db.id === id)
-    
-    if (databaseIndex === -1) {
-      return mockResponse(null, true, 404)
-    }
-    
-    const updatedDatabase = { ...databases[databaseIndex], ...data }
-    databases[databaseIndex] = updatedDatabase
-    
-    return mockResponse(updatedDatabase)
-  }
-  
-  return api.put(`/database/timeseries/${id}`, data)
-}
-
-// 删除时序数据库
-export const deleteTimeseriesDatabase = async (id: string): Promise<ApiResponse<boolean>> => {
-  if (useMock()) {
-    return mockResponse(true)
-  }
-  
-  return api.delete(`/database/timeseries/${id}`)
 }
 
 // 获取时间序列列表
@@ -205,44 +160,6 @@ export const getRetentionPolicies = async (databaseId: string): Promise<ApiRespo
   }
   
   return api.get(`/database/timeseries/${databaseId}/retention-policies`)
-}
-
-// 更新保留策略
-export const updateRetentionPolicy = async (databaseId: string, policyName: string, data: any): Promise<ApiResponse<any>> => {
-  if (useMock()) {
-    return mockResponse({
-      name: policyName,
-      ...data
-    })
-  }
-  
-  return api.put(`/database/timeseries/${databaseId}/retention-policies/${policyName}`, data)
-}
-
-// 删除保留策略
-export const deleteRetentionPolicy = async (databaseId: string, policyName: string): Promise<ApiResponse<boolean>> => {
-  if (useMock()) {
-    return mockResponse(true)
-  }
-  
-  return api.delete(`/database/timeseries/${databaseId}/retention-policies/${policyName}`)
-}
-
-// 获取时序数据库统计信息
-export const getTimeseriesDatabaseStats = async (databaseId: string): Promise<ApiResponse<any>> => {
-  if (useMock()) {
-    return mockResponse({
-      seriesCount: 156,
-      totalPoints: "1.2B",
-      diskSize: "45.8 GB",
-      writeRate: "10K points/s",
-      readRate: "25K points/s",
-      uptime: "45d 12h 30m",
-      lastBackup: "2023-05-09 01:00:00"
-    })
-  }
-  
-  return api.get(`/database/timeseries/${databaseId}/stats`)
 }
 
 // 获取时序数据库性能指标
