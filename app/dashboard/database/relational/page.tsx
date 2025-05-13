@@ -9,7 +9,8 @@ import {
   MoreHorizontal,
   Play,
   Download,
-  AlertTriangle
+  AlertTriangle,
+  FileText
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -196,9 +197,17 @@ export default function RelationalDatabasePage() {
                         <DropdownMenuContent align="end">
                           <DropdownMenuLabel>数据库操作</DropdownMenuLabel>
                           <DropdownMenuSeparator />
-                          <DropdownMenuItem>查看表</DropdownMenuItem>
-                          <DropdownMenuItem>备份</DropdownMenuItem>
-                          <DropdownMenuItem>复制</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => {
+                            setSelectedDatabase(db.id)
+                            setActiveTab("tables")
+                          }}>
+                            <Table className="mr-2 h-4 w-4" />
+                            查看表
+                          </DropdownMenuItem>
+                          <DropdownMenuItem>
+                            <FileText className="mr-2 h-4 w-4" />
+                            备份
+                          </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem className="text-red-600">删除</DropdownMenuItem>
                         </DropdownMenuContent>
@@ -224,6 +233,25 @@ export default function RelationalDatabasePage() {
               </Button>
             </div>
             <div className="flex items-center gap-2">
+              <Select 
+                value={selectedDatabase || ""} 
+                onValueChange={setSelectedDatabase}
+              >
+                <SelectTrigger className="w-[220px]">
+                  <SelectValue placeholder="选择数据库" />
+                </SelectTrigger>
+                <SelectContent>
+                  {loadingDatabases ? (
+                    <SelectItem value="loading" disabled>加载中...</SelectItem>
+                  ) : (
+                    databases.map((db) => (
+                      <SelectItem key={db.id} value={db.id}>
+                        {db.name} ({db.id})
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
               <Button>
                 <Table className="mr-2 h-4 w-4" />
                 创建表
@@ -234,14 +262,21 @@ export default function RelationalDatabasePage() {
           <Card>
             <CardHeader>
               <CardTitle>表管理</CardTitle>
-              <CardDescription>请先选择一个数据库</CardDescription>
+              <CardDescription>
+                {selectedDatabase ? 
+                  `${databases.find(db => db.id === selectedDatabase)?.name || selectedDatabase} 中的表` : 
+                  "请先选择一个数据库"}
+              </CardDescription>
             </CardHeader>
-            <CardContent className="flex items-center justify-center h-64 border-2 border-dashed rounded-md">
-              <div className="text-center">
-                <Database className="mx-auto h-12 w-12 text-muted-foreground" />
-                <h3 className="mt-2 text-lg font-medium">未选择数据库</h3>
-                <p className="mt-1 text-sm text-muted-foreground">请从数据库列表中选择一个数据库来管理表</p>
-              </div>
+            <CardContent>
+              <Button 
+                variant="outline" 
+                className="w-full py-8"
+                onClick={() => window.location.href = "/dashboard/database/relational/tables"}
+              >
+                <Table className="mr-2 h-5 w-5" />
+                前往表管理页面
+              </Button>
             </CardContent>
           </Card>
         </TabsContent>
