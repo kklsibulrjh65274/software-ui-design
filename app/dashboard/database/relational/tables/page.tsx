@@ -16,6 +16,7 @@ import {
   Key,
   ArrowLeft
 } from "lucide-react"
+import Link from "next/link"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
@@ -34,7 +35,6 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
-import { useRouter } from "next/navigation"
 import {
   Dialog,
   DialogContent,
@@ -50,7 +50,6 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { databaseApi, dataModelApi } from "@/api"
 
 export default function RelationalTablesPage() {
-  const router = useRouter()
   const [searchTable, setSearchTable] = useState("")
   const [selectedDatabase, setSelectedDatabase] = useState<string | null>(null)
   const [selectedTable, setSelectedTable] = useState<string | null>(null)
@@ -466,10 +465,12 @@ export default function RelationalTablesPage() {
           <Button 
             variant="outline" 
             size="sm" 
-            onClick={() => router.push("/dashboard/database/relational")}
+            asChild
           >
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            返回数据库列表
+            <Link href="/dashboard/database/relational">
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              返回数据库列表
+            </Link>
           </Button>
           <div>
             <h1 className="text-3xl font-bold tracking-tight">表管理</h1>
