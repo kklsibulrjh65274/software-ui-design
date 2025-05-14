@@ -467,7 +467,7 @@ export default function ClusterNodesPage() {
                           <Progress
                             value={node.cpu}
                             className="h-2 flex-1"
-                            indicatorclassname={
+                            indicatorClassName={
                               node.cpu > 80 ? "bg-red-500" : node.cpu > 60 ? "bg-amber-500" : "bg-green-500"
                             }
                           />
@@ -483,7 +483,7 @@ export default function ClusterNodesPage() {
                           <Progress
                             value={node.memory}
                             className="h-2 flex-1"
-                            indicatorclassname={
+                            indicatorClassName={
                               node.memory > 80 ? "bg-red-500" : node.memory > 60 ? "bg-amber-500" : "bg-green-500"
                             }
                           />
@@ -713,7 +713,7 @@ export default function ClusterNodesPage() {
                               <Progress
                                 value={node.cpu}
                                 className="h-2"
-                                indicatorclassname={
+                                indicatorClassName={
                                   node.cpu > 80 ? "bg-red-500" : node.cpu > 60 ? "bg-amber-500" : "bg-green-500"
                                 }
                               />
@@ -727,7 +727,7 @@ export default function ClusterNodesPage() {
                               <Progress
                                 value={node.memory}
                                 className="h-2"
-                                indicatorclassname={
+                                indicatorClassName={
                                   node.memory > 80 ? "bg-red-500" : node.memory > 60 ? "bg-amber-500" : "bg-green-500"
                                 }
                               />
@@ -741,7 +741,7 @@ export default function ClusterNodesPage() {
                               <Progress
                                 value={node.disk}
                                 className="h-2"
-                                indicatorclassname={
+                                indicatorClassName={
                                   node.disk > 80 ? "bg-red-500" : node.disk > 60 ? "bg-amber-500" : "bg-green-500"
                                 }
                               />
