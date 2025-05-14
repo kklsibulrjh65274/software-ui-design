@@ -45,7 +45,28 @@ export const updateSystemSettings = async (data: any): Promise<ApiResponse<any>>
 export const getSystemLogs = async (params?: QueryParams): Promise<ApiResponse<any[]>> => {
   if (useMock()) {
     // 返回模拟的系统日志数据
-    return mockResponse(getMockData('systemLogs'))
+    const logs = getMockData('systemLogs')
+    
+    // 处理搜索和过滤
+    let filteredLogs = [...logs]
+    if (params?.search) {
+      const searchLower = params.search.toLowerCase()
+      filteredLogs = filteredLogs.filter(log => 
+        log.message.toLowerCase().includes(searchLower) || 
+        log.source.toLowerCase().includes(searchLower)
+      )
+    }
+    
+    if (params?.filter) {
+      if (params.filter.level) {
+        filteredLogs = filteredLogs.filter(log => log.level === params.filter.level)
+      }
+      if (params.filter.source) {
+        filteredLogs = filteredLogs.filter(log => log.source === params.filter.source)
+      }
+    }
+    
+    return mockResponse(filteredLogs)
   }
   
   return api.get('/system/logs', { params })
@@ -55,7 +76,28 @@ export const getSystemLogs = async (params?: QueryParams): Promise<ApiResponse<a
 export const getSystemAlerts = async (params?: QueryParams): Promise<ApiResponse<any[]>> => {
   if (useMock()) {
     // 返回模拟的系统告警数据
-    return mockResponse(getMockData('systemAlerts'))
+    const alerts = getMockData('systemAlerts')
+    
+    // 处理搜索和过滤
+    let filteredAlerts = [...alerts]
+    if (params?.search) {
+      const searchLower = params.search.toLowerCase()
+      filteredAlerts = filteredAlerts.filter(alert => 
+        alert.title.toLowerCase().includes(searchLower) || 
+        alert.message.toLowerCase().includes(searchLower)
+      )
+    }
+    
+    if (params?.filter) {
+      if (params.filter.severity) {
+        filteredAlerts = filteredAlerts.filter(alert => alert.severity === params.filter.severity)
+      }
+      if (params.filter.acknowledged !== undefined) {
+        filteredAlerts = filteredAlerts.filter(alert => alert.acknowledged === params.filter.acknowledged)
+      }
+    }
+    
+    return mockResponse(filteredAlerts)
   }
   
   return api.get('/system/alerts', { params })

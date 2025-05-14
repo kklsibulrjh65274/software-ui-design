@@ -26,7 +26,7 @@ import {
   Settings,
   Trash2,
   XCircle,
-  Search as SearchIcon,
+  Search,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -307,7 +307,7 @@ export default function AlertsPage() {
                     </Select>
                   </div>
                   <div className="relative">
-                    <SearchIcon className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                     <Input
                       type="search"
                       placeholder="搜索告警..."
