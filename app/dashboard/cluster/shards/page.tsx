@@ -783,9 +783,7 @@ export default function ClusterShardsPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>迁移分片</DialogTitle>
-            <DialogDescription>
-              将分片迁移到另一个节点
-            </DialogDescription>
+            <DialogDescription>将分片迁移到另一个节点</DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid grid-cols-4 items-center gap-4">

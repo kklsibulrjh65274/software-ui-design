@@ -106,7 +106,7 @@ function timeAgo(date: Date) {
 
 export default function AlertsPage() {
   const [activeTab, setActiveTab] = useState("current")
-  const [selectedAlert, setSelectedAlert] = useState<any>(null)
+  const [selectedAlert, setSelectedAlert] = useState<any | null>(null)
   const [showAlertDetails, setShowAlertDetails] = useState(false)
   const [filterSeverity, setFilterSeverity] = useState<string>("all")
   const [searchQuery, setSearchQuery] = useState("")
