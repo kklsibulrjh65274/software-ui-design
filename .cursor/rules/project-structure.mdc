@@ -1,36 +1,67 @@
 ---
 description: 
 globs: 
-alwaysApply: false
+alwaysApply: true
 ---
-# 项目结构与入口说明
+# 项目结构与入口说明（发散版）
 
-本项目为分布式融合数据库与存储管理系统的前端部分，采用 [Next.js](mdc:https:/nextjs.org) + React + TypeScript + Tailwind CSS 技术栈，属于前后端分离架构。
+本项目为分布式融合数据库与存储管理系统的前端部分，采用 [Next.js](mdc:https:/nextjs.org) + React + TypeScript + Tailwind CSS 技术栈，属于前后端分离架构，强调现代前端工程的可维护性、可扩展性与团队协作。
 
-> 注意：本仓库仅包含前端实现，`api/` 目录为 mock 数据或前端接口定义，并不包含真实后端逻辑。
+> ⚠️ 本仓库仅包含前端实现，`api/` 目录为 mock 数据或前端接口定义，便于前端开发、联调和后端对接模拟。
 
-## 主要入口
+## 主要入口与配置
 - 前端主入口：[app/layout.tsx](mdc:app/layout.tsx)
 - Next.js 配置：[next.config.mjs](mdc:next.config.mjs)
 - TypeScript 配置：[tsconfig.json](mdc:tsconfig.json)
 - 依赖管理：[package.json](mdc:package.json)
+- Tailwind 配置：[tailwind.config.ts](mdc:tailwind.config.ts)
+- 全局样式入口：[app/globals.css](mdc:app/globals.css) 或 [styles/](mdc:styles)
 
 ## 主要目录说明
-- [app/](mdc:app)：前端页面与路由，包含 dashboard、database、security、storage 等子模块
-- [api/](mdc:api)：mock 数据或前端接口定义，便于前端开发和联调
-- [components/](mdc:components)：通用 React 组件与 UI 组件
-- [lib/](mdc:lib)：工具库与 API 封装
-- [hooks/](mdc:hooks)：自定义 React Hooks
-- [public/](mdc:public)：静态资源
-- [styles/](mdc:styles)：全局样式
-- [.bolt/](mdc:.bolt)：CI/CD、Docker、测试等配置文件
+- [app/](mdc:app)：页面与路由，按业务模块分层，支持嵌套路由与布局复用
+- [api/](mdc:api)：mock 数据、前端接口定义、类型声明，建议与后端 OpenAPI/Swagger 保持同步
+- [components/](mdc:components)：通用 UI 组件、业务组件，推荐原子化、可复用、文档化
+- [lib/](mdc:lib)：工具库、API 封装、通用逻辑
+- [hooks/](mdc:hooks)：自定义 React Hooks，提升代码复用性与可测试性
+- [public/](mdc:public)：静态资源（图片、字体、favicon 等）
+- [styles/](mdc:styles)：全局与模块化样式，支持 Tailwind 与自定义 CSS
+- [.bolt/](mdc:.bolt)：CI/CD、Docker、测试、代码规范等工程化配置
+- [mock/](mdc:mock)：（可选）更复杂的 mock 服务、数据生成脚本、联调工具
+- [config/](mdc:config)：（可选）环境变量、运行时配置、feature flag 管理
+
+## 工程最佳实践建议
+- 组件、hooks、lib 等目录建议按功能/领域分组，避免单一大文件夹
+- mock 数据应与真实接口结构保持一致，便于后端切换与联调
+- 类型定义（如 `types/`）建议与业务、API 强关联，提升类型安全
+- 推荐使用 Storybook、Playwright 等工具进行组件开发与端到端测试
+- 支持国际化（i18n）可在 `locales/` 或 `i18n/` 目录管理多语言资源
+- 代码风格统一建议采用 Prettier、ESLint、Stylelint 等工具自动化
+- CI/CD 流程建议集成自动测试、构建、预览与部署
+
+## 团队协作与演化建议
+- 目录与模块命名应清晰、语义化，便于新成员快速上手
+- 重要业务流、mock 约定、接口变更建议文档化（如 `docs/` 或 README）
+- 支持多人协作的分支策略（如 Git Flow、Trunk Based Development）
+- 组件、API、mock 数据等建议配套单元测试与文档
+- 定期回顾目录结构，适时重构，保持工程整洁
 
 ## 运行与开发
 - 开发启动：`npm run dev`
 - 生产构建：`npm run build`
 - 生产启动：`npm run start`
+- 代码格式化：`npm run format`
+- 代码检查：`npm run lint`
+- 单元测试：`npm run test`
 
+## 文件引用规范
 如需引用本规则中的文件，请使用 `[文件名](mdc:文件名)` 格式，路径相对于项目根目录。
+
+---
+
+> 本规则旨在为团队提供结构化、可扩展、现代化的前端项目导航指引，欢迎根据实际业务持续补充与优化。
+
+
+
 
 
 
