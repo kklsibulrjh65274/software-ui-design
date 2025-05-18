@@ -1,0 +1,36 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# 项目结构与入口说明
+
+本项目为分布式融合数据库与存储管理系统的前端部分，采用 [Next.js](mdc:https:/nextjs.org) + React + TypeScript + Tailwind CSS 技术栈，属于前后端分离架构。
+
+> 注意：本仓库仅包含前端实现，`api/` 目录为 mock 数据或前端接口定义，并不包含真实后端逻辑。
+
+## 主要入口
+- 前端主入口：[app/layout.tsx](mdc:app/layout.tsx)
+- Next.js 配置：[next.config.mjs](mdc:next.config.mjs)
+- TypeScript 配置：[tsconfig.json](mdc:tsconfig.json)
+- 依赖管理：[package.json](mdc:package.json)
+
+## 主要目录说明
+- [app/](mdc:app)：前端页面与路由，包含 dashboard、database、security、storage 等子模块
+- [api/](mdc:api)：mock 数据或前端接口定义，便于前端开发和联调
+- [components/](mdc:components)：通用 React 组件与 UI 组件
+- [lib/](mdc:lib)：工具库与 API 封装
+- [hooks/](mdc:hooks)：自定义 React Hooks
+- [public/](mdc:public)：静态资源
+- [styles/](mdc:styles)：全局样式
+- [.bolt/](mdc:.bolt)：CI/CD、Docker、测试等配置文件
+
+## 运行与开发
+- 开发启动：`npm run dev`
+- 生产构建：`npm run build`
+- 生产启动：`npm run start`
+
+如需引用本规则中的文件，请使用 `[文件名](mdc:文件名)` 格式，路径相对于项目根目录。
+
+
+
