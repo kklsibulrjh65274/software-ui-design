@@ -1,5 +1,6 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import { Activity, Database, HardDrive, AlertTriangle, Server, FileText } from "lucide-react"
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -9,20 +10,75 @@ import { SystemHealthChart } from "@/components/dashboard/system-health-chart"
 import { StatusCard } from "@/components/dashboard/status-card"
 import { NavigationCard } from "@/components/dashboard/navigation-card"
 
+// Import API
+import { systemApi } from "@/api"
+
 export default function DashboardPage() {
+  const [alerts, setAlerts] = useState<any[]>([])
+  const [systemStatus, setSystemStatus] = useState({
+    health: { value: "良好", description: "所有系统正常运行", status: "success" },
+    storage: { value: "42%", description: "已使用 4.2TB / 10TB", status: "warning" },
+    nodes: { value: "18/20", description: "18 个节点在线", status: "success" },
+    databases: { value: "12/15", description: "3 个实例需要注意", status: "warning" }
+  })
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const fetchAlerts = async () => {
+      try {
+        setLoading(true)
+        const response = await systemApi.getSystemAlerts()
+        if (response.success) {
+          setAlerts(response.data)
+        } else {
+          setError(response.message)
+        }
+      } catch (err) {
+        setError('获取告警数据失败')
+        console.error(err)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchAlerts()
+  }, [])
+
+  // Get the 5 most recent alerts
+  const recentAlerts = alerts.slice(0, 5)
+
   return (
     <div className="flex flex-col gap-4">
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <StatusCard title="系统健康状态" value="良好" description="所有系统正常运行" icon={Activity} status="success" />
+        <StatusCard 
+          title="系统健康状态" 
+          value={systemStatus.health.value} 
+          description={systemStatus.health.description} 
+          icon={Activity} 
+          status={systemStatus.health.status as "success" | "warning" | "error" | "default"} 
+        />
         <StatusCard
           title="存储使用量"
-          value="42%"
-          description="已使用 4.2TB / 10TB"
+          value={systemStatus.storage.value}
+          description={systemStatus.storage.description}
           icon={HardDrive}
-          status="warning"
+          status={systemStatus.storage.status as "success" | "warning" | "error" | "default"}
         />
-        <StatusCard title="节点状态" value="18/20" description="18 个节点在线" icon={Server} status="success" />
-        <StatusCard title="数据库实例" value="12/15" description="3 个实例需要注意" icon={Database} status="warning" />
+        <StatusCard 
+          title="节点状态" 
+          value={systemStatus.nodes.value} 
+          description={systemStatus.nodes.description} 
+          icon={Server} 
+          status={systemStatus.nodes.status as "success" | "warning" | "error" | "default"} 
+        />
+        <StatusCard 
+          title="数据库实例" 
+          value={systemStatus.databases.value} 
+          description={systemStatus.databases.description} 
+          icon={Database} 
+          status={systemStatus.databases.status as "success" | "warning" | "error" | "default"} 
+        />
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
@@ -41,31 +97,44 @@ export default function DashboardPage() {
             <CardDescription>最近 5 条重要告警</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Alert variant="destructive">
-              <AlertTriangle className="h-4 w-4" />
-              <AlertTitle>存储节点离线</AlertTitle>
-              <AlertDescription>节点 ID: node-12 已离线超过 10 分钟</AlertDescription>
-            </Alert>
-            <Alert variant="warning">
-              <AlertTriangle className="h-4 w-4" />
-              <AlertTitle>存储空间不足</AlertTitle>
-              <AlertDescription>数据库集群 DB-03 存储空间使用率超过 85%</AlertDescription>
-            </Alert>
-            <Alert>
-              <FileText className="h-4 w-4" />
-              <AlertTitle>备份任务完成</AlertTitle>
-              <AlertDescription>数据库 postgres-main 备份任务已完成</AlertDescription>
-            </Alert>
-            <Alert>
-              <Activity className="h-4 w-4" />
-              <AlertTitle>性能异常</AlertTitle>
-              <AlertDescription>数据库 timeseries-01 查询延迟增加</AlertDescription>
-            </Alert>
-            <Alert>
-              <Server className="h-4 w-4" />
-              <AlertTitle>节点已恢复</AlertTitle>
-              <AlertDescription>节点 ID: node-08 已恢复在线状态</AlertDescription>
-            </Alert>
+            {loading ? (
+              <div className="flex justify-center items-center py-4">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+              </div>
+            ) : error ? (
+              <Alert variant="destructive">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertTitle>错误</AlertTitle>
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            ) : recentAlerts.length === 0 ? (
+              <div className="text-center py-4">
+                <p className="text-muted-foreground">暂无告警</p>
+              </div>
+            ) : (
+              recentAlerts.map((alert) => {
+                let IconComponent = FileText;
+                let variant: "default" | "destructive" | undefined = "default";
+                
+                if (alert.severity === "critical") {
+                  IconComponent = AlertTriangle;
+                  variant = "destructive";
+                } else if (alert.severity === "high") {
+                  IconComponent = AlertTriangle;
+                  variant = "destructive";
+                } else if (alert.severity === "medium") {
+                  IconComponent = Activity;
+                }
+                
+                return (
+                  <Alert key={alert.id} variant={variant}>
+                    <IconComponent className="h-4 w-4" />
+                    <AlertTitle>{alert.title}</AlertTitle>
+                    <AlertDescription>{alert.message}</AlertDescription>
+                  </Alert>
+                );
+              })
+            )}
           </CardContent>
         </Card>
       </div>

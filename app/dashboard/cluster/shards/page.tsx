@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Layers, Search, Filter, MoreHorizontal, RefreshCw, ArrowRightLeft, AlertTriangle, Plus, Trash2, Server } from "lucide-react"
+import { Layers, Search, Filter, MoreHorizontal, Play, ArrowRightLeft, AlertTriangle, Plus, Trash2, RefreshCw, Save, Download, Server } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -783,9 +783,7 @@ export default function ClusterShardsPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>迁移分片</DialogTitle>
-            <DialogDescription>
-              将分片迁移到另一个节点
-            </DialogDescription>
+            <DialogDescription>将分片迁移到另一个节点</DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid grid-cols-4 items-center gap-4">
